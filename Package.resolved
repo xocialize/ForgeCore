@@ -1,5 +1,5 @@
 {
-  "originHash" : "adeb8b87e79649ffdcabd93015aaea118f1b8055037a63c475726957ad88fb3f",
+  "originHash" : "f5611692066fee12c2d96a8ba1babbebe9fc074b464e1b292184815fdadcbcaa",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -69,8 +69,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/matroska-swift.git",
       "state" : {
-        "revision" : "6465897fe5a1e1ff0cea347a0e45e6f13d669a80",
-        "version" : "0.1.1"
+        "revision" : "7baa8a635259bc9bd2b7f3a3dffff6bcd700e453",
+        "version" : "0.2.0"
       }
     },
     {
@@ -78,8 +78,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/media-bridge.git",
       "state" : {
-        "revision" : "dfdde3075d1a7636c5aca56dfd9de7282b9942b9",
-        "version" : "0.6.1"
+        "revision" : "0331e1dade7c41b5d84e4e81baa67597e56df451",
+        "version" : "0.7.0"
       }
     },
     {
