@@ -1,0 +1,39 @@
+name: ci
+
+# A vanilla checkout + build IS the guarantee this package exists to provide: ForgeCore is the single
+# place the MLX pins resolve, so if a clean clone can't resolve and build it, two consuming projects
+# will diverge — which is the drift that produced the original mess.
+#
+# BUILD SYSTEM (must stay pinned): ForgeCore links MLX through mlx-engine-swift, and MLX loads its Metal
+# kernels from a `default.metallib` compiled from Cmlx's `.metal` sources into a resource bundle beside
+# the test binary. Only the `swiftbuild` build system compiles those sources; the deprecated `native` one
+# silently ships no metallib, so the first allocator call hits mlx-swift's aborting error handler and
+# kills the entire xctest process (signal 5) — while the log still reads "all tests passed". That exact
+# trap had mlx-engine-swift's CI green-while-broken. Do not remove the flag.
+#
+# The tests themselves are deliberately CoreGraphics-only (image-coding boundary arithmetic and the model
+# table), so they assert real invariants without needing weights or a GPU. Live capability verification
+# happens in the reference app's smoke runner, which has a model store to draw on.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select latest stable Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Toolchain
+        run: |
+          swift --version
+          xcodebuild -showComponent MetalToolchain || echo "MetalToolchain component not reported"
+      - name: Build
+        run: swift build --build-system swiftbuild -v
+      - name: Test
+        run: swift test --build-system swiftbuild

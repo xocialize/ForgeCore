@@ -1,0 +1,75 @@
+// swift-tools-version: 6.2
+import PackageDescription
+
+// ForgeCore — category B (engine adapters), per CLAUDE.md "Package categories".
+//
+// B owns the heavy pins: mlx-engine-swift and every mlx-*-swift wrapper resolve HERE and nowhere else,
+// so two consuming projects cannot diverge on Package.resolved.
+//
+// What this package deliberately does NOT depend on:
+//
+//   • vpx-swift — it vendors vpx.xcframework, and B's net-consumable bar forbids vendored binaries.
+//     Linking it is also what accepts the libvpx PATENTS grant, which is a consumer's decision to make,
+//     not one to inherit silently. The app registers `VpxVideoDecoder` into media-bridge itself.
+//   • MLXEngineUI — ForgeCore stays headless so its tests run without SwiftUI and a CLI can consume it.
+//     The models-folder root arrives as a URL; owning `ModelStorageModel` (folder pick, security-scoped
+//     bookmark) is the app's job, and the reference app shows how.
+//   • Any *UI package — the SwiftUI capability classes are category C/A-UI, above this seam.
+
+let package = Package(
+    name: "ForgeCore",
+    // Floats to what MLX needs. This is precisely why B cannot fold into A: the net-clean Kits keep
+    // their macOS-14 floor because this package carries the 26.x/Metal requirement instead.
+    platforms: [.macOS(.v26)],
+    products: [
+        .library(name: "ForgeCore", targets: ["ForgeCore"]),
+    ],
+    dependencies: [
+        // A — net-clean Kits owning the provider protocols these adapters implement.
+        .package(url: "https://github.com/xocialize/ForgeOptimizerKit.git", from: "0.1.0"),
+        .package(url: "https://github.com/xocialize/ExtractKit.git", from: "0.1.0"),
+        .package(url: "https://github.com/xocialize/ColorizeKit.git", from: "0.1.0"),
+        .package(url: "https://github.com/xocialize/EraseKit.git", from: "0.1.0"),
+        .package(url: "https://github.com/xocialize/MaskKit.git", from: "0.1.0"),
+        .package(url: "https://github.com/xocialize/media-bridge.git", from: "0.3.0"),
+
+        // The engine. v0.37.0 is the FIRST tag carrying `licenseEnforcement` (contract 1.28.0) —
+        // do not lower this floor, or `.blocking` silently stops being expressible.
+        .package(url: "https://github.com/xocialize/mlx-engine-swift.git", from: "0.37.0"),
+
+        // Model wrappers — the heavy pins.
+        .package(url: "https://github.com/xocialize/mlx-nafnet-swift.git", from: "0.4.0"),
+        .package(url: "https://github.com/xocialize/mlx-realesrgan-swift.git", from: "0.5.0"),
+        .package(url: "https://github.com/xocialize/mlx-birefnet-swift.git", from: "0.4.0"),
+        .package(url: "https://github.com/xocialize/mlx-ddcolor-swift.git", from: "0.2.0"),
+        .package(url: "https://github.com/xocialize/mlx-lama-swift.git", from: "0.2.0"),
+        .package(url: "https://github.com/xocialize/mlx-sea-raft-swift.git", from: "0.5.0"),
+        .package(url: "https://github.com/xocialize/mlx-edgetam-swift.git", from: "0.4.0"),
+    ],
+    targets: [
+        .target(
+            name: "ForgeCore",
+            dependencies: [
+                .product(name: "ForgeOptimizerKit", package: "ForgeOptimizerKit"),
+                .product(name: "ExtractKit", package: "ExtractKit"),
+                .product(name: "ColorizeKit", package: "ColorizeKit"),
+                .product(name: "EraseKit", package: "EraseKit"),
+                .product(name: "MaskKit", package: "MaskKit"),
+                .product(name: "MediaMeasure", package: "media-bridge"),
+                .product(name: "MLXServeCore", package: "mlx-engine-swift"),
+                .product(name: "MLXToolKit", package: "mlx-engine-swift"),
+                .product(name: "MLXNAFNet", package: "mlx-nafnet-swift"),
+                .product(name: "MLXRealESRGAN", package: "mlx-realesrgan-swift"),
+                .product(name: "MLXBiRefNet", package: "mlx-birefnet-swift"),
+                .product(name: "MLXDDColor", package: "mlx-ddcolor-swift"),
+                .product(name: "MLXInpaint", package: "mlx-lama-swift"),
+                .product(name: "MLXSEARAFT", package: "mlx-sea-raft-swift"),
+                .product(name: "MLXEdgeTAM", package: "mlx-edgetam-swift"),
+            ]
+        ),
+        // ⚠️ Run with `swift test --build-system swiftbuild`. Importing MLX inherits the metallib
+        // requirement, and the deprecated `native` build system ships no metallib — it aborts the whole
+        // xctest process while the log still reads "all tests passed".
+        .testTarget(name: "ForgeCoreTests", dependencies: ["ForgeCore"]),
+    ]
+)
