@@ -26,12 +26,12 @@ let package = Package(
     ],
     dependencies: [
         // A — net-clean Kits owning the provider protocols these adapters implement.
-        .package(url: "https://github.com/xocialize/ForgeOptimizerKit.git", from: "0.1.0"),
+        .package(url: "https://github.com/xocialize/ForgeOptimizerKit.git", from: "0.4.0"),
         .package(url: "https://github.com/xocialize/ExtractKit.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/ColorizeKit.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/EraseKit.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/MaskKit.git", from: "0.1.0"),
-        .package(url: "https://github.com/xocialize/media-bridge.git", from: "0.7.0"),
+        .package(url: "https://github.com/xocialize/media-bridge.git", from: "0.9.1"),
 
         // The engine. v0.37.0 is the FIRST tag carrying `licenseEnforcement` (contract 1.28.0) —
         // do not lower this floor, or `.blocking` silently stops being expressible.

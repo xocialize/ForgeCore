@@ -1,5 +1,5 @@
 {
-  "originHash" : "f5611692066fee12c2d96a8ba1babbebe9fc074b464e1b292184815fdadcbcaa",
+  "originHash" : "38babbbb2fef6d38944cc06aa7ee66f1180b1b101cb1b809351ad1a2d66f25dc",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -42,8 +42,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/ForgeOptimizerKit.git",
       "state" : {
-        "revision" : "68f8a870f2a6b6a20d2dd4fb6bd8ce10d56abd62",
-        "version" : "0.1.0"
+        "revision" : "ab7c56f7217d00d21e70d8bfda6040cb5f614d13",
+        "version" : "0.4.0"
       }
     },
     {
@@ -78,8 +78,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/media-bridge.git",
       "state" : {
-        "revision" : "0331e1dade7c41b5d84e4e81baa67597e56df451",
-        "version" : "0.7.0"
+        "revision" : "2ba649126e8bd8debfe003893c87030a295c1986",
+        "version" : "0.9.1"
       }
     },
     {
