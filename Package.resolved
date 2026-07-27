@@ -1,5 +1,5 @@
 {
-  "originHash" : "38babbbb2fef6d38944cc06aa7ee66f1180b1b101cb1b809351ad1a2d66f25dc",
+  "originHash" : "711364aee73769cae3f4f9156fcfe2e58ffcb35621d258ff5704a96bcc00b074",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/EraseKit.git",
       "state" : {
-        "revision" : "9b1c6b722092128828f1d8867bc9edc320e10bdd",
-        "version" : "0.1.0"
+        "revision" : "9d8e8e385ed47f37a1827fda9cb022ddef8c43ab",
+        "version" : "0.2.0"
       }
     },
     {

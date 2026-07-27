@@ -18,7 +18,14 @@ import MLXToolKit
 @MainActor
 public final class EngineInpaintProvider: InpaintProvider {
 
-    public nonisolated let name = "LaMa"
+    /// Provider identity. **Not** the model for a given run — see `engineName(for:)`.
+    public nonisolated let name = "LaMa / MI-GAN"
+
+    /// The model that actually runs each tier. `.fast` is MI-GAN, `.best` is LaMa; reporting "LaMa"
+    /// for both is the receipt bug BRIDGE-060 exists to fix.
+    public nonisolated func engineName(for quality: InpaintQuality) -> String {
+        quality == .fast ? "MI-GAN" : "LaMa"
+    }
 
     private let service: ForgeEngineService
 
