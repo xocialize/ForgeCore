@@ -103,23 +103,36 @@ public final class ForgeEngineService {
 
     private var packageIDs: [ForgeModel: PackageID] = [:]
 
-    /// Which NAFNet checkpoint backs `imageRestore`.
+    /// Which NAFNet checkpoint backs `imageRestore`. **Default `.signage`, by measurement.**
     ///
-    /// A parameter rather than a constant because the choice is **contested and measurable**
-    /// (BRIDGE-064): `.siddWidth64` trains on SIDD's five smartphone sensors, and NIND measured it
-    /// last among blind denoisers on DSLR content — worse than not denoising at ISO 1600. `.signage`
-    /// is a different width-24 checkpoint that nobody has measured. Hard-coding either buries the
-    /// decision where it cannot be compared.
+    /// ⚠️ **The variant names mislead.** `.signage` is not signage-specific — it is a width-24
+    /// checkpoint that behaves as a *conservative general* restore. `.siddWidth64` trains on SIDD's
+    /// five smartphone sensors and is badly out of domain on anything else.
+    ///
+    /// Measured (BRIDGE-064) as SSIMULACRA2 of restored-vs-original — how far the restore step moves
+    /// already-clean content, where a low score is damage rather than repair:
+    ///
+    /// | corpus | `.siddWidth64` | `.signage` |
+    /// |---|---|---|
+    /// | 10 signage stills | mean 64.07 / worst 56.81 | mean 82.97 / worst 80.14 |
+    /// | 4 real photographs (Canon·Sony·Nikon·Ricoh RAW) | **mean 42.78 / worst 23.30** | mean 83.16 / worst 70.04 |
+    ///
+    /// `.siddWidth64` lands every signage still below Forge's own **aggressive** floor (70) and reaches
+    /// **23.3** on a photograph — gross departure from an untouched source. `.signage` scores the same
+    /// on both corpora (82.97 / 83.16), which is what rules out "it just suits signage".
+    ///
+    /// Independently corroborated: NIND measured `.siddWidth64` at **−1.48 dB at ISO 1600 — worse than
+    /// not denoising** on DSLR content. Different corpus, different metric, same verdict.
     public let restoreVariant: NAFNetVariant
 
     /// - Parameters:
     ///   - policy: license gate. Leave at `.permissiveOnly` for a shipping product; a research build
     ///     may widen it.
     ///   - enforcement: leave `.blocking`. See the note on `engine`.
-    ///   - restoreVariant: see `restoreVariant`. The default is what Forge shipped, not a verdict.
+    ///   - restoreVariant: see `restoreVariant`. The default changed to `.signage` on evidence.
     public init(policy: LicensePolicy = .permissiveOnly,
                 enforcement: LicenseEnforcement = .blocking,
-                restoreVariant: NAFNetVariant = .siddWidth64) {
+                restoreVariant: NAFNetVariant = .signage) {
         self.engine = MLXServeEngine(policy: policy, licenseEnforcement: enforcement)
         self.restoreVariant = restoreVariant
     }
