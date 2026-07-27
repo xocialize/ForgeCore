@@ -29,21 +29,14 @@ jobs:
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
-      # ForgeCore depends on five PRIVATE xocialize Kits (ForgeOptimizerKit, ExtractKit, ColorizeKit,
-      # EraseKit, MaskKit). The default GITHUB_TOKEN is scoped to this repository only, so SwiftPM's
-      # clone of a sibling private repo fails with "could not read Username for 'https://github.com'" —
-      # a message that reads like a network problem and is not one. Fail fast with the actual fix
-      # instead, and rewrite the URL scheme when the token is present.
-      - name: Auth for private xocialize dependencies
-        env:
-          TOKEN: ${{ secrets.FORGE_CI_TOKEN }}
-        run: |
-          if [ -z "$TOKEN" ]; then
-            echo "::error::Missing repo secret FORGE_CI_TOKEN. ForgeCore resolves private xocialize Kits, which the default GITHUB_TOKEN cannot clone. Create a fine-grained PAT with read access to ForgeOptimizerKit, ExtractKit, ColorizeKit, EraseKit and MaskKit, add it as FORGE_CI_TOKEN, or make those Kits public."
-            exit 1
-          fi
-          git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
-
+      # No credential step: every dependency in this package's closure is public — the five Forge Kits
+      # (ForgeOptimizerKit, ExtractKit, ColorizeKit, EraseKit, MaskKit), media-bridge, the mlx-*-swift
+      # wrappers, and mlx-engine-swift. ForgeCore itself stays private, which the default GITHUB_TOKEN
+      # can clone because it is scoped to this repository.
+      #
+      # If a future dependency is private, SwiftPM fails with "could not read Username for
+      # 'https://github.com'" — a message that reads like a network fault and is not one. The fix is a
+      # PAT in a repo secret plus a `git config url.<token>.insteadOf` rewrite, not a retry.
       - name: Toolchain
         run: |
           swift --version
