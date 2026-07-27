@@ -83,6 +83,19 @@ error deep inside that package instead of at the boundary.
 
 `Matte` is PNG-only by contract regardless.
 
+## CI setup (one manual step)
+
+ForgeCore resolves five **private** xocialize Kits, and a workflow's default `GITHUB_TOKEN` is scoped to
+its own repository — so CI cannot clone them. It fails with *"could not read Username for
+`https://github.com`"*, which reads like a network fault and isn't one.
+
+Add a repository secret **`FORGE_CI_TOKEN`**: a fine-grained PAT with read access to `ForgeOptimizerKit`,
+`ExtractKit`, `ColorizeKit`, `EraseKit` and `MaskKit`. The workflow rewrites the URL scheme with it. (The
+alternative is making those Kits public.) Until it exists, CI fails fast with that instruction rather
+than a wall of clone errors.
+
+Local builds are unaffected — your own git credentials already reach the private repos.
+
 ## Testing
 
 ```bash
