@@ -103,13 +103,25 @@ public final class ForgeEngineService {
 
     private var packageIDs: [ForgeModel: PackageID] = [:]
 
+    /// Which NAFNet checkpoint backs `imageRestore`.
+    ///
+    /// A parameter rather than a constant because the choice is **contested and measurable**
+    /// (BRIDGE-064): `.siddWidth64` trains on SIDD's five smartphone sensors, and NIND measured it
+    /// last among blind denoisers on DSLR content — worse than not denoising at ISO 1600. `.signage`
+    /// is a different width-24 checkpoint that nobody has measured. Hard-coding either buries the
+    /// decision where it cannot be compared.
+    public let restoreVariant: NAFNetVariant
+
     /// - Parameters:
     ///   - policy: license gate. Leave at `.permissiveOnly` for a shipping product; a research build
     ///     may widen it.
     ///   - enforcement: leave `.blocking`. See the note on `engine`.
+    ///   - restoreVariant: see `restoreVariant`. The default is what Forge shipped, not a verdict.
     public init(policy: LicensePolicy = .permissiveOnly,
-                enforcement: LicenseEnforcement = .blocking) {
+                enforcement: LicenseEnforcement = .blocking,
+                restoreVariant: NAFNetVariant = .siddWidth64) {
         self.engine = MLXServeEngine(policy: policy, licenseEnforcement: enforcement)
+        self.restoreVariant = restoreVariant
     }
 
     // MARK: - Model store
@@ -170,7 +182,7 @@ public final class ForgeEngineService {
             switch model {
             case .restore:
                 id = try await engine.register(NAFNetRestorePackage.registration,
-                                               configuration: NAFNetConfiguration(variant: .siddWidth64))
+                                               configuration: NAFNetConfiguration(variant: restoreVariant))
             case .upscale:
                 id = try await engine.register(RealESRGANUpscalePackage.registration,
                                                configuration: RealESRGANConfiguration(variant: .general))
