@@ -1,5 +1,5 @@
 {
-  "originHash" : "5713119c7772fd04f0175081c7f4165d01d9a74454b894a325c7350b52309874",
+  "originHash" : "3d9a5e1486b92964ea21ee5eb3e2e4a689ec179b25ad14457059469ab6e60959",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -78,8 +78,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/media-bridge.git",
       "state" : {
-        "revision" : "8ad9162d24eebe3110808762005beced08c94050",
-        "version" : "0.4.1"
+        "revision" : "d83fdc052b1e63fef6dc0191fba77eec254ce0b2",
+        "version" : "0.5.0"
       }
     },
     {
@@ -105,8 +105,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-edgetam-swift.git",
       "state" : {
-        "revision" : "e3b6efe510914da1ca31c9d51bf42175999508ad",
-        "version" : "0.4.0"
+        "revision" : "84b6a75a67f41aec5ef539120f20662970abfde1",
+        "version" : "0.4.1"
       }
     },
     {
