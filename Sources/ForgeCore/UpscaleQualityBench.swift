@@ -95,6 +95,57 @@ public enum UpscaleQualityBench {
         ProcessInfo.processInfo.environment["FORGE_BENCH_REGIME"].map { [$0] } ?? ["bicubic", "lanczos"]
     }
 
+    // MARK: - Resolution-envelope diagnosis
+
+    /// Is SeedVR2's stills path broken by **output resolution** or by **scale factor**?
+    ///
+    /// 🔑 **Why this is the right question.** `SeedVR2ImageRefiner` already does the thing it looked like
+    /// it was missing: CoreImage Lanczos pre-upscale → one-step diffusion refine at 1:1 → LAB colour
+    /// transfer. That is the *same* recipe as the video path. The one difference is that the video path
+    /// refines in `tileSize`² tiles via `MLXTileProcessor(scale: 1)` while the image path does a single
+    /// monolithic pass — and the refiner's own header admits it: *"V1 is single-pass (no tiling):
+    /// activation is resolution-driven… Tiling for very large images is a future lever."*
+    ///
+    /// SeedVR2 uses **windowed attention** (`window: [4,3,3]`) over a latent that is 1/8 the pixel size.
+    /// A 2048² single pass is a 256²-token latent — far outside anything the model was trained on, which
+    /// would show up as global softness and misregistration rather than as noise. **So the two cells that
+    /// separate the hypotheses are (256→1024, ×4) and (512→1024, ×2): same output resolution, different
+    /// scale factor. If both are fine and 2048 is broken, it is the envelope, and the fix is tiling —
+    /// machinery the package already ships.**
+    public static func diagnoseResolutionEnvelope(imageURL: URL,
+                                                  service: ForgeEngineService,
+                                                  progress: @Sendable (String) -> Void) async {
+        guard let master = loadCGImage(imageURL) else {
+            progress("  could not load \(imageURL.lastPathComponent)"); return
+        }
+        // (referenceSide, lowSide, scale) — the reference is always a LOSSLESS crop at that side.
+        let cells = [(512, 128, 4), (1024, 256, 4), (1024, 512, 2), (2048, 512, 4)]
+        for (refSide, lowSide, scale) in cells {
+            guard let reference = centreCrop(master, side: refSide) else {
+                progress("  \(refSide)² crop unavailable"); continue
+            }
+            guard let low = resampleCG(reference, side: lowSide, quality: .high) else { continue }
+            let tag = "\(lowSide)to\(refSide)_x\(scale)"
+
+            if let up = resampleCG(low, side: refSide, quality: .high),
+               let score = try? MediaMeasure.ssimulacra2(reference: reference, distorted: up) {
+                progress(String(format: "  %-18s bicubic     %8.2f", tag, score))
+            }
+            do {
+                let m = try await service.measureUpscale(low, model: .upscaleQuality, scale: scale)
+                dump(m.image, as: "envelope__\(tag)__SeedVR2")
+                dump(reference, as: "envelope__\(tag)__reference")
+                let score = (try? MediaMeasure.ssimulacra2(reference: reference, distorted: m.image)) ?? .nan
+                let stats = statistics(m.image)
+                progress(String(format: "  %-18s SeedVR2-3B  %8.2f   out %d×%d  %.1fs  sigma %.1f",
+                                tag, score, m.outputWidth, m.outputHeight, m.runSeconds,
+                                stats?.sigma[1] ?? -1))
+            } catch {
+                progress("  \(tag) SeedVR2 FAILED — \(error)")
+            }
+        }
+    }
+
     /// Per-channel mean and standard deviation. **A near-zero σ means a flat image** — the cheap,
     /// unambiguous test for "the model returned nothing" that a score cannot give you.
     public static func statistics(_ image: CGImage) -> (mean: [Double], sigma: [Double])? {
