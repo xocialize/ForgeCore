@@ -129,7 +129,7 @@ public enum UpscaleQualityBench {
 
             if let up = resampleCG(low, side: refSide, quality: .high),
                let score = try? MediaMeasure.ssimulacra2(reference: reference, distorted: up) {
-                progress(String(format: "  %-18s bicubic     %8.2f", tag, score))
+                progress(String(format: "  %@  bicubic     %8.2f", tag.padding(toLength: 16, withPad: " ", startingAt: 0), score))
             }
             do {
                 let m = try await service.measureUpscale(low, model: .upscaleQuality, scale: scale)
@@ -137,8 +137,11 @@ public enum UpscaleQualityBench {
                 dump(reference, as: "envelope__\(tag)__reference")
                 let score = (try? MediaMeasure.ssimulacra2(reference: reference, distorted: m.image)) ?? .nan
                 let stats = statistics(m.image)
-                progress(String(format: "  %-18s SeedVR2-3B  %8.2f   out %d×%d  %.1fs  sigma %.1f",
-                                tag, score, m.outputWidth, m.outputHeight, m.runSeconds,
+                // ⚠️ `%@`, never `%s`. `String(format:)` expects a C string for `%s` and prints garbage
+                // bytes for a Swift String — the first envelope run emitted "ÿ±ÊÍ" for every label.
+                progress(String(format: "  %@  SeedVR2-3B  %8.2f   out %d×%d  %.1fs  sigma %.1f",
+                                tag.padding(toLength: 16, withPad: " ", startingAt: 0),
+                                score, m.outputWidth, m.outputHeight, m.runSeconds,
                                 stats?.sigma[1] ?? -1))
             } catch {
                 progress("  \(tag) SeedVR2 FAILED — \(error)")

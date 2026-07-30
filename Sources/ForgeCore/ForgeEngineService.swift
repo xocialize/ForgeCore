@@ -213,8 +213,12 @@ public final class ForgeEngineService {
                 id = try await engine.register(RealESRGANUpscalePackage.registration,
                                                configuration: RealESRGANConfiguration(variant: .general))
             case .upscaleQuality:
-                // int8 by default: the fp16 repo exists but the port's own configuration notes record
-                // fp16 collapsing to ~22.7 dB, so int8 is the shipping quant, not a compromise.
+                // int8 is the validated default and **near-lossless** — the port measures it at ~50.3 dB
+                // / cos 0.9999 against fp16, at ~4.7 GB vs ~7.5 GB. (⚠️ An earlier version of this comment
+                // said fp16 "collapses to ~22.7 dB". That was a misreading: **int4** is the one that
+                // degrades to 22.7 dB, and it is deliberately not offered. The choice is right; the stated
+                // reason was wrong, and it mattered — it made quantization a suspect when V10 found the
+                // stills path failing, which cost a diagnostic detour.)
                 id = try await engine.register(SeedVR2UpscalePackage.registration,
                                                configuration: SeedVR2Configuration(quant: .int8))
             case .matte:
