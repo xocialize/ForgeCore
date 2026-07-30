@@ -219,8 +219,26 @@ public final class ForgeEngineService {
                 // degrades to 22.7 dB, and it is deliberately not offered. The choice is right; the stated
                 // reason was wrong, and it mattered — it made quantization a suspect when V10 found the
                 // stills path failing, which cost a diagnostic detour.)
+                // ⚠️ **Tile geometry is env-overridable for diagnostics only** (`FORGE_SEEDVR2_TILE`,
+                // `FORGE_SEEDVR2_OVERLAP`, `FORGE_SEEDVR2_WHOLEFRAME`). V10 established that the stills
+                // path must tile above ~1 MP output, and then that the *residual* error is concentrated
+                // in FLAT regions — 4.23 MAE vs 1.74 for an in-envelope single pass, while edge error is
+                // unchanged. That is the overlap blend: neighbouring tiles reconstruct slightly different
+                // DC levels from different border context, and feathering two disagreeing levels leaves a
+                // ramp across every seam. 🔑 The two levers are **bigger tiles** (fewer seams, and V10
+                // showed 1024² is still in-regime so 256 was needlessly small) and **more overlap** (32/256
+                // = 12.5%, where tiled diffusion normally wants 25–50%). Sweeping beats guessing — three
+                // hypotheses were already wrong here.
+                let env = ProcessInfo.processInfo.environment
+                let tile = env["FORGE_SEEDVR2_TILE"].flatMap(Int.init) ?? 256
+                let overlap = env["FORGE_SEEDVR2_OVERLAP"].flatMap(Int.init) ?? 32
+                let wholeFrame = env["FORGE_SEEDVR2_WHOLEFRAME"].flatMap(Int.init) ?? (1024 * 1024)
                 id = try await engine.register(SeedVR2UpscalePackage.registration,
-                                               configuration: SeedVR2Configuration(quant: .int8))
+                                               configuration: SeedVR2Configuration(
+                                                   quant: .int8,
+                                                   tileSize: tile,
+                                                   tileOverlap: overlap,
+                                                   imageWholeFramePixels: wholeFrame))
             case .matte:
                 id = try await engine.register(BiRefNetPackage.registration,
                                                configuration: BiRefNetConfiguration())
