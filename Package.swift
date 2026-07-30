@@ -41,7 +41,7 @@ let package = Package(
         .package(url: "https://github.com/xocialize/mlx-nafnet-swift.git", from: "0.4.0"),
         .package(url: "https://github.com/xocialize/mlx-realesrgan-swift.git", from: "0.5.0"),
     // The quality tier behind `imageUpscale` — a second backer, not a replacement.
-    .package(url: "https://github.com/xocialize/mlx-seedvr2-swift.git", from: "0.7.1"),
+    .package(url: "https://github.com/xocialize/mlx-seedvr2-swift.git", from: "0.7.2"),
         .package(url: "https://github.com/xocialize/mlx-birefnet-swift.git", from: "0.4.0"),
         .package(url: "https://github.com/xocialize/mlx-ddcolor-swift.git", from: "0.2.0"),
         .package(url: "https://github.com/xocialize/mlx-lama-swift.git", from: "0.2.0"),
