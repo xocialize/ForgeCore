@@ -76,6 +76,58 @@ public enum UpscaleQualityBench {
     public static let referenceSide = 2048
     public static let lowSide = 512
 
+    /// 🔑 **Dump every intermediate to disk when set.** A full-reference score is a single number, and a
+    /// single number cannot tell "this method is worse" apart from "this method returned garbage" — a
+    /// content-INDEPENDENT score is the signature of the latter. Set `FORGE_BENCH_DUMP` to a directory and
+    /// the reference, the low-res input and every upscale land there as PNGs, which is the only way to
+    /// tell those two apart. (The Anima lesson: an eyeball gate with no reference beside it passes
+    /// garbage; a metric with no image beside it *reports* garbage as a result.)
+    static var dumpDirectory: URL? {
+        ProcessInfo.processInfo.environment["FORGE_BENCH_DUMP"].map {
+            URL(fileURLWithPath: $0, isDirectory: true)
+        }
+    }
+    /// Cap the sweep for a fast diagnostic pass.
+    static var imageLimit: Int? {
+        ProcessInfo.processInfo.environment["FORGE_BENCH_LIMIT"].flatMap(Int.init)
+    }
+    static var regimes: [String] {
+        ProcessInfo.processInfo.environment["FORGE_BENCH_REGIME"].map { [$0] } ?? ["bicubic", "lanczos"]
+    }
+
+    /// Per-channel mean and standard deviation. **A near-zero σ means a flat image** — the cheap,
+    /// unambiguous test for "the model returned nothing" that a score cannot give you.
+    public static func statistics(_ image: CGImage) -> (mean: [Double], sigma: [Double])? {
+        let w = image.width, h = image.height
+        var bytes = [UInt8](repeating: 0, count: w * h * 4)
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let ctx = CGContext(data: &bytes, width: w, height: h, bitsPerComponent: 8,
+                                  bytesPerRow: w * 4, space: space,
+                                  bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)
+        else { return nil }
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        var mean = [Double](repeating: 0, count: 3), sq = [Double](repeating: 0, count: 3)
+        let n = Double(w * h)
+        for i in stride(from: 0, to: w * h * 4, by: 4) {
+            for c in 0..<3 {
+                let v = Double(bytes[i + c])
+                mean[c] += v; sq[c] += v * v
+            }
+        }
+        for c in 0..<3 { mean[c] /= n; sq[c] = max(0, sq[c] / n - mean[c] * mean[c]) }
+        return (mean, sq.map { $0.squareRoot() })
+    }
+
+    static func dump(_ image: CGImage, as name: String) {
+        guard let directory = dumpDirectory else { return }
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent(name + ".png")
+        guard let destination = CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil)
+        else { return }
+        CGImageDestinationAddImage(destination, image, nil)
+        CGImageDestinationFinalize(destination)
+    }
+
     // MARK: - Entry point
 
     /// Score every method on every image in both regimes.
@@ -88,7 +140,7 @@ public enum UpscaleQualityBench {
                            progress: (@Sendable (String) -> Void)? = nil) async -> [UpscaleQualityRow] {
         var rows: [UpscaleQualityRow] = []
 
-        for url in imageURLs {
+        for url in (imageLimit.map { Array(imageURLs.prefix($0)) } ?? imageURLs) {
             let name = url.deletingPathExtension().lastPathComponent
             // The corpus encodes its split in the filename; honour it rather than re-deriving it.
             let contentClass = name.contains("_graphic") ? "graphic"
@@ -102,11 +154,13 @@ public enum UpscaleQualityBench {
                 continue
             }
 
-            for regime in ["bicubic", "lanczos"] {
+            dump(reference, as: "\(name)__reference")
+            for regime in regimes {
                 guard let low = downsample(reference, to: lowSide, regime: regime) else {
                     progress?("  \(name)/\(regime): SKIP — downsample failed")
                     continue
                 }
+                dump(low, as: "\(name)__\(regime)__low")
 
                 // --- classical arms: the floor, and a second floor below it ---
                 for (method, upscaler) in classicalArms() {
@@ -116,6 +170,12 @@ public enum UpscaleQualityBench {
                         continue
                     }
                     let seconds = Date().timeIntervalSince(start)
+                    dump(up, as: "\(name)__\(regime)__\(method)")
+                    if let stats = statistics(up) {
+                        progress?(String(format: "      %@ stats mean %.1f/%.1f/%.1f sigma %.1f/%.1f/%.1f",
+                                         method, stats.mean[0], stats.mean[1], stats.mean[2],
+                                         stats.sigma[0], stats.sigma[1], stats.sigma[2]))
+                    }
                     if let score = try? MediaMeasure.ssimulacra2(reference: reference, distorted: up) {
                         rows.append(UpscaleQualityRow(imageName: name, contentClass: contentClass,
                                                       regime: regime, method: method,
@@ -129,6 +189,12 @@ public enum UpscaleQualityBench {
                     guard let service else { continue }
                     do {
                         let m = try await service.measureUpscale(low, model: model, scale: 4)
+                        dump(m.image, as: "\(name)__\(regime)__\(model.modelName)")
+                        if let stats = statistics(m.image) {
+                            progress?(String(format: "      %@ stats mean %.1f/%.1f/%.1f sigma %.1f/%.1f/%.1f",
+                                             model.modelName, stats.mean[0], stats.mean[1], stats.mean[2],
+                                             stats.sigma[0], stats.sigma[1], stats.sigma[2]))
+                        }
                         if let score = try? MediaMeasure.ssimulacra2(reference: reference, distorted: m.image) {
                             rows.append(UpscaleQualityRow(imageName: name, contentClass: contentClass,
                                                           regime: regime, method: model.modelName,
