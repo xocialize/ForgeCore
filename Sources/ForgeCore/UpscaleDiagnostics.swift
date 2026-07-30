@@ -38,6 +38,10 @@ public struct UpscaleMeasurement: Sendable {
     /// What the model actually did. ⚠️ May differ from the requested scale — a fixed-factor upscaler
     /// applies its own, and reporting the request instead of the result is how a receipt starts lying.
     public let appliedScale: Int
+    /// The result pixels. Returned rather than made a second call: the timings above are taken around
+    /// `run` alone, so handing back the image cannot contaminate them — and a scoring caller that had to
+    /// re-run would pay the model's full cost twice for pixels it already produced.
+    public let image: CGImage
 }
 
 extension ForgeEngineService {
@@ -80,7 +84,8 @@ extension ForgeEngineService {
                                   runSeconds: runSeconds,
                                   outputWidth: out.width,
                                   outputHeight: out.height,
-                                  appliedScale: upscale.appliedScale)
+                                  appliedScale: upscale.appliedScale,
+                                  image: out)
     }
 
     public enum DiagnosticsError: Error, CustomStringConvertible {
