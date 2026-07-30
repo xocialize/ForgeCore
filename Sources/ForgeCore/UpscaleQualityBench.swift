@@ -642,6 +642,15 @@ public enum UpscaleQualityBench {
             if !refAnchors.isEmpty || !lowAnchors.isEmpty {
                 lines.append("")
                 lines.append("    ── ANCHORS (not methods — the ceiling and the floor) ──")
+                // 🚨 Measured on the first probe run, and it is a fact about the ORACLE, not the corpus:
+                // `Bayer_photo` scored ref NR 0.8861 against low-input NR 0.9167 — the 512² JPEG-crushed
+                // input read as *cleaner than the untouched 2048² master*. SigLIP2 mean-pools 224² patches
+                // at native scale, so a smaller image presents proportionally less fine texture per patch
+                // and reads as smoother. **The low-input NR is therefore NOT a floor for the 2048² columns
+                // above it** — it is only comparable to another 512² figure. The usable floor at 2048² is
+                // the bicubic arm. Same caveat, same reason, as the gradient column.
+                lines.append("    ⚠️ NR and gradient are BOTH resolution-sensitive: the 512² low-input is not")
+                lines.append("       comparable to the 2048² columns above (a smaller image reads as cleaner).")
                 lines.append("      " + "image".padding(toLength: 22, withPad: " ", startingAt: 0)
                              + "ref NR".padding(toLength: width, withPad: " ", startingAt: 0)
                              + "ref grad".padding(toLength: width, withPad: " ", startingAt: 0)
