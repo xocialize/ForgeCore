@@ -1,5 +1,5 @@
 {
-  "originHash" : "d6f4ef5fe5e8b56d591868518d786bac67f548d3f26954af6bc630d8cca5a0c6",
+  "originHash" : "c99cc50ce05d27be132e8d69869ce88adbd483c4eb2d5736d418e9a2672323fd",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -60,8 +60,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/MaskKit.git",
       "state" : {
-        "revision" : "6efd2617064f2ac1354aca55e7445dd459a6cf52",
-        "version" : "0.1.0"
+        "revision" : "4a9536cb4434c40351c1a49e84d6a689e05fd555",
+        "version" : "0.2.0"
       }
     },
     {
@@ -78,8 +78,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/media-bridge.git",
       "state" : {
-        "revision" : "2ba649126e8bd8debfe003893c87030a295c1986",
-        "version" : "0.9.1"
+        "revision" : "eaac3d8788315e33f8dc0436147f3c4ccada2a8f",
+        "version" : "0.10.0"
       }
     },
     {
@@ -114,8 +114,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-engine-swift.git",
       "state" : {
-        "revision" : "3d0ecb9ac16fe74be395671c9c16f3be746cae65",
-        "version" : "0.37.0"
+        "revision" : "6bed83fab8f6849cebdd991a7a16456c3a764ce9",
+        "version" : "0.40.1"
       }
     },
     {
@@ -150,8 +150,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-realesrgan-swift.git",
       "state" : {
-        "revision" : "9e2e1a9da859f782f21a52984a92092656f555ee",
-        "version" : "0.6.0"
+        "revision" : "1e06d233c9bfe8a997332ad933d0a86ba274328b",
+        "version" : "0.6.1"
       }
     },
     {
@@ -168,8 +168,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-seedvr2-swift.git",
       "state" : {
-        "revision" : "fc1999aa3be0b39b54de50a63872a673fd23fb7d",
-        "version" : "0.7.4"
+        "revision" : "c9f5973de946f0d2841aa74a239596d49a44b7b6",
+        "version" : "0.7.5"
       }
     },
     {

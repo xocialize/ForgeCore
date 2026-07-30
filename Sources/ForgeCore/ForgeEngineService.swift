@@ -245,12 +245,17 @@ public final class ForgeEngineService {
                 let env = ProcessInfo.processInfo.environment
                 let tile = env["FORGE_SEEDVR2_TILE"].flatMap(Int.init) ?? 256
                 let overlap = env["FORGE_SEEDVR2_OVERLAP"].flatMap(Int.init) ?? 32
+                // Halo (context padding): the V10-fix lever that changes each tile's CONTEXT rather
+                // than its blend — must be a multiple of 8 keeping tile+2·halo /16. Default 0
+                // pending the halo sweep's verdict.
+                let halo = env["FORGE_SEEDVR2_HALO"].flatMap(Int.init) ?? 0
                 let wholeFrame = env["FORGE_SEEDVR2_WHOLEFRAME"].flatMap(Int.init) ?? (1024 * 1024)
                 id = try await engine.register(SeedVR2UpscalePackage.registration,
                                                configuration: SeedVR2Configuration(
                                                    quant: .int8,
                                                    tileSize: tile,
                                                    tileOverlap: overlap,
+                                                   tileHalo: halo,
                                                    imageWholeFramePixels: wholeFrame))
             case .matte:
                 id = try await engine.register(BiRefNetPackage.registration,
