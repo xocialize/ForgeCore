@@ -1,5 +1,5 @@
 {
-  "originHash" : "c99cc50ce05d27be132e8d69869ce88adbd483c4eb2d5736d418e9a2672323fd",
+  "originHash" : "230b48d937c38beaacce6318f4755ee5b30d2a7a8e5c4786077515aa0bef46c8",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -150,8 +150,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-realesrgan-swift.git",
       "state" : {
-        "revision" : "1e06d233c9bfe8a997332ad933d0a86ba274328b",
-        "version" : "0.6.1"
+        "revision" : "7ac175d743124450af10804b4a723086db1973f6",
+        "version" : "0.6.2"
       }
     },
     {
@@ -168,8 +168,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-seedvr2-swift.git",
       "state" : {
-        "revision" : "c9f5973de946f0d2841aa74a239596d49a44b7b6",
-        "version" : "0.7.5"
+        "revision" : "4385179e6265934df01cc3a23a005b67bda556bc",
+        "version" : "0.7.6"
       }
     },
     {
