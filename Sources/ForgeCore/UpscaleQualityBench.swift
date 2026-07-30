@@ -16,11 +16,26 @@
 //  *plausible* content. So this bench does not measure "which is sharper"; it measures **how much of the
 //  reference each method actually recovers**, which is the only question a full-reference metric answers.
 //
-//  ⚠️ **Both degradation regimes are run, and that is not thoroughness for its own sake.** No choice of
+//  ⚠️ **Every degradation regime is run, and that is not thoroughness for its own sake.** No choice of
 //  downsampler is neutral: matched Lanczos-down/Lanczos-up flatters Lanczos, while bicubic-down is
 //  *in-distribution* for Real-ESRGAN (its training pipeline randomises bicubic/bilinear/area resize).
-//  Reporting one regime would hand the win to whichever arm it favoured. Two regimes make the bias
+//  Reporting one regime would hand the win to whichever arm it favoured. Multiple regimes make the bias
 //  visible instead of load-bearing.
+//
+//  🚨 **`jpeg` is the regime that can invert the finding, and it is why it was added.** `bicubic` and
+//  `lanczos` are *clean* downsamples: the low-res input contains no artefact, so there is **nothing to
+//  undo**, and a method that adds no information cannot be wrong about information it did not add.
+//  That regime flatters interpolation by construction, and every V10 number before this one was taken
+//  in it. A JPEG-crushed source is the opposite case — blocking, ringing and chroma damage are *real
+//  degradation with a correct answer* — and it is also what signage actually arrives as. If a learned
+//  tier is ever going to beat a windowed sinc on a full-reference metric, this is where.
+//
+//  🚨 **TWO ORACLES, REPORTED SIDE BY SIDE, NEVER AVERAGED.** `CLAUDE.md`: *SigLIP2 NR-IQA gates whether
+//  to restore (no reference); SSIMULACRA2 gates how hard to compress (full-reference).* V10 ran the
+//  full-reference oracle alone and got an ordering that the detail axis exactly inverted — which is not
+//  a metric malfunctioning but a fidelity metric doing its job on a *generative* method. Both oracles
+//  plus the detail axis are recorded per cell here. **The disagreement is the result; collapsing it into
+//  one number would delete the finding.**
 //
 //  🔑 **The reference is a LOSSLESS CROP, never a resize.** A 2048² centre crop of a ~4K master contains
 //  real sensor/render pixels; a resized reference would bake one resampler's artefacts into the ground
@@ -39,18 +54,54 @@ import MediaMeasure
 import Metal
 import MetalPerformanceShaders
 
-/// One (image × regime × method) cell.
+/// One (image × regime × method) cell — **three numbers, deliberately not one.**
 public struct UpscaleQualityRow: Sendable {
     public let imageName: String
     /// `photo` or `graphic` — the corpus's own split, and the axis this bench exists to separate.
     public let contentClass: String
-    /// Which downsampler produced the low-res input.
+    /// Which degradation produced the low-res input: `bicubic`, `lanczos` or `jpeg`.
     public let regime: String
     public let method: String
-    /// SSIMULACRA2 vs the lossless reference crop. Higher is better; ~90 is "visually fine", negative is
-    /// possible and means severely degraded.
+    /// **Full-reference.** SSIMULACRA2 vs the lossless reference crop. Higher is better; ~90 is
+    /// "visually fine", negative is possible and means severely degraded. ⚠️ Structurally biased
+    /// *against* invented detail — see this file's header.
     public let score: Double
+    /// **No-reference.** SigLIP2 NR-IQA, 0–1, "restoration-pays" semantics: low where enhancement would
+    /// help, high on clean content. Filled by the second pass; nil if the oracle was unavailable.
+    /// ⚠️ Blind to content identity and gameable by over-sharpening — never read alone either.
+    public var nrScore: Double?
+    /// **The detail axis.** Mean gradient magnitude on luma. Not a quality score at all — an amount of
+    /// high-frequency content — and it is here because it is the axis on which V10's two defensible
+    /// orderings disagreed. Compare against `UpscaleQualityAnchor.gradient` for the reference.
+    public let gradient: Double
     public let seconds: Double
+}
+
+/// A control cell that is **not a method**: the reference itself and the degraded input.
+///
+/// 🔑 **Without these the no-reference numbers are uninterpretable.** An NR score has no natural zero —
+/// 0.62 means nothing until you know what the untouched master and the crushed input score on the same
+/// scale. The reference is the ceiling; the low-res input is the floor the upscalers start from. A
+/// method scoring *above* the reference is the signature of over-sharpening, which is exactly the way
+/// NR-IQA is known to be gameable, and it is only visible with the anchor in the table.
+public struct UpscaleQualityAnchor: Sendable {
+    public let imageName: String
+    public let contentClass: String
+    /// `reference` (regime-independent, recorded once as `—`) or the regime whose low-res input this is.
+    public let regime: String
+    /// `reference` or `low-input`.
+    public let kind: String
+    public var nrScore: Double?
+    public let gradient: Double
+    /// Pixel side — the low-res input is 512², the reference 2048². ⚠️ Gradient magnitude is
+    /// resolution-dependent, so the low-input gradient is **not** comparable to a 2048² row.
+    public let side: Int
+}
+
+/// Everything one sweep produced.
+public struct UpscaleQualityResult: Sendable {
+    public var rows: [UpscaleQualityRow]
+    public var anchors: [UpscaleQualityAnchor]
 }
 
 public enum UpscaleQualityBench {
@@ -91,8 +142,17 @@ public enum UpscaleQualityBench {
     static var imageLimit: Int? {
         ProcessInfo.processInfo.environment["FORGE_BENCH_LIMIT"].flatMap(Int.init)
     }
+    /// ⚠️ Order matters for the receipt, not for the result: `jpeg` runs last so that a sweep killed
+    /// part-way still carries both clean regimes complete rather than three regimes half-done.
+    public static let allRegimes = ["bicubic", "lanczos", "jpeg"]
     static var regimes: [String] {
-        ProcessInfo.processInfo.environment["FORGE_BENCH_REGIME"].map { [$0] } ?? ["bicubic", "lanczos"]
+        ProcessInfo.processInfo.environment["FORGE_BENCH_REGIME"].map { [$0] } ?? allRegimes
+    }
+    /// JPEG quality for the `jpeg` regime. **0.3 is chosen to be visibly damaged, not subtly so** — the
+    /// question is whether a learned tier can *undo* an artefact, and a quality level where the artefact
+    /// is near-invisible cannot discriminate (#43c: never choose from a regime that cannot discriminate).
+    static var jpegQuality: Double {
+        ProcessInfo.processInfo.environment["FORGE_BENCH_JPEG_Q"].flatMap(Double.init) ?? 0.3
     }
 
     // MARK: - Resolution-envelope diagnosis
@@ -184,15 +244,29 @@ public enum UpscaleQualityBench {
 
     // MARK: - Entry point
 
-    /// Score every method on every image in both regimes.
+    /// Score every method on every image in every regime, with **both** oracles.
+    ///
+    /// 🔑 **Two passes, and the split is a memory decision, not a style one.** Pass 1 runs the
+    /// transforms and the full-reference oracle; pass 2 runs the no-reference oracle over what pass 1
+    /// dumped. Interleaving them would drive SeedVR2 (≈8.4 GB attributed) and SigLIP2 (≈1.2 GB
+    /// resident) in and out of the engine's admission window once per cell — and SeedVR2's warm load is
+    /// ~10 s against a ~34 s run, so alternating would inflate the sweep by roughly a third to measure
+    /// nothing extra. Each model loads once.
+    ///
+    /// ⚠️ **Pass 2 reads the dumped PNGs, not the in-memory images, and that is deliberate.** PNG is
+    /// lossless so the pixels are identical, but scoring the file means the no-reference number is
+    /// attached to *the artifact a human can open and look at* — which is the whole method rule V10
+    /// exists to enforce (a content-independent score is a defect signature, and only the dumped image
+    /// can tell you which it was). Without `FORGE_BENCH_DUMP` there is no pass 2, and the receipt says so.
     ///
     /// - Parameter learnedArms: the engine-backed tiers to include. Pass `[]` to run the classical arms
     ///   alone (fast, and enough to establish the floor).
     public static func run(imageURLs: [URL],
                            service: ForgeEngineService?,
                            learnedArms: [ForgeModel],
-                           progress: (@Sendable (String) -> Void)? = nil) async -> [UpscaleQualityRow] {
+                           progress: (@Sendable (String) -> Void)? = nil) async -> UpscaleQualityResult {
         var rows: [UpscaleQualityRow] = []
+        var anchors: [UpscaleQualityAnchor] = []
 
         for url in (imageLimit.map { Array(imageURLs.prefix($0)) } ?? imageURLs) {
             let name = url.deletingPathExtension().lastPathComponent
@@ -209,12 +283,23 @@ public enum UpscaleQualityBench {
             }
 
             dump(reference, as: "\(name)__reference")
+            let referenceGradient = meanGradient(reference)
+            anchors.append(UpscaleQualityAnchor(imageName: name, contentClass: contentClass,
+                                                regime: "—", kind: "reference",
+                                                nrScore: nil, gradient: referenceGradient,
+                                                side: referenceSide))
+            progress?(String(format: "  %@  REFERENCE gradient %.3f", name, referenceGradient))
+
             for regime in regimes {
                 guard let low = downsample(reference, to: lowSide, regime: regime) else {
                     progress?("  \(name)/\(regime): SKIP — downsample failed")
                     continue
                 }
                 dump(low, as: "\(name)__\(regime)__low")
+                anchors.append(UpscaleQualityAnchor(imageName: name, contentClass: contentClass,
+                                                    regime: regime, kind: "low-input",
+                                                    nrScore: nil, gradient: meanGradient(low),
+                                                    side: lowSide))
 
                 // --- classical arms: the floor, and a second floor below it ---
                 for (method, upscaler) in classicalArms() {
@@ -230,11 +315,14 @@ public enum UpscaleQualityBench {
                                          method, stats.mean[0], stats.mean[1], stats.mean[2],
                                          stats.sigma[0], stats.sigma[1], stats.sigma[2]))
                     }
+                    let gradient = meanGradient(up)
                     if let score = try? MediaMeasure.ssimulacra2(reference: reference, distorted: up) {
                         rows.append(UpscaleQualityRow(imageName: name, contentClass: contentClass,
                                                       regime: regime, method: method,
-                                                      score: score, seconds: seconds))
-                        progress?(String(format: "  %@/%@/%@  %.2f  (%.3fs)", name, regime, method, score, seconds))
+                                                      score: score, nrScore: nil,
+                                                      gradient: gradient, seconds: seconds))
+                        progress?(String(format: "  %@/%@/%@  FR %.2f  grad %.3f  (%.3fs)",
+                                         name, regime, method, score, gradient, seconds))
                     }
                 }
 
@@ -249,12 +337,14 @@ public enum UpscaleQualityBench {
                                              model.modelName, stats.mean[0], stats.mean[1], stats.mean[2],
                                              stats.sigma[0], stats.sigma[1], stats.sigma[2]))
                         }
+                        let gradient = meanGradient(m.image)
                         if let score = try? MediaMeasure.ssimulacra2(reference: reference, distorted: m.image) {
                             rows.append(UpscaleQualityRow(imageName: name, contentClass: contentClass,
                                                           regime: regime, method: model.modelName,
-                                                          score: score, seconds: m.runSeconds))
-                            progress?(String(format: "  %@/%@/%@  %.2f  (%.2fs)",
-                                             name, regime, model.modelName, score, m.runSeconds))
+                                                          score: score, nrScore: nil,
+                                                          gradient: gradient, seconds: m.runSeconds))
+                            progress?(String(format: "  %@/%@/%@  FR %.2f  grad %.3f  (%.2fs)",
+                                             name, regime, model.modelName, score, gradient, m.runSeconds))
                         }
                     } catch {
                         progress?("  \(name)/\(regime)/\(model.modelName): FAILED — \(error)")
@@ -262,7 +352,64 @@ public enum UpscaleQualityBench {
                 }
             }
         }
-        return rows
+
+        var result = UpscaleQualityResult(rows: rows, anchors: anchors)
+        await scoreNoReference(&result, service: service, progress: progress)
+        return result
+    }
+
+    // MARK: - Pass 2 · the no-reference oracle
+
+    /// Fill `nrScore` on every row and anchor by re-reading what pass 1 dumped.
+    ///
+    /// 🚨 **The anchors are scored first and on purpose.** An NR score has no natural zero: 0.62 is
+    /// neither good nor bad until the untouched master and the degraded input have been put on the same
+    /// scale. Scoring them first means that if the run is killed part-way there is still a usable frame
+    /// of reference for whatever rows did complete.
+    static func scoreNoReference(_ result: inout UpscaleQualityResult,
+                                 service: ForgeEngineService?,
+                                 progress: (@Sendable (String) -> Void)?) async {
+        guard let service else { return }
+        guard let directory = dumpDirectory else {
+            progress?("  V10-Q NR pass SKIPPED — FORGE_BENCH_DUMP unset, so there are no artifacts to score")
+            return
+        }
+        if await service.packageID(for: .qualityScore) == nil {
+            progress?("  V10-Q NR pass SKIPPED — SigLIP2-IQA did not register: "
+                      + (await service.outcome(for: .qualityScore)?.failure ?? "no failure recorded"))
+            return
+        }
+        progress?("  ── pass 2: SigLIP2 NR-IQA (no-reference, 0–1, high = clean) ──")
+
+        func score(_ file: String) async -> Double? {
+            let url = directory.appendingPathComponent(file + ".png")
+            guard let image = loadCGImage(url) else {
+                progress?("      NR: missing artifact \(file).png")
+                return nil
+            }
+            do { return try await service.scoreNoReferenceQuality(image) }
+            catch {
+                progress?("      NR FAILED on \(file) — \(error)")
+                return nil
+            }
+        }
+
+        for i in result.anchors.indices {
+            let a = result.anchors[i]
+            let file = a.kind == "reference" ? "\(a.imageName)__reference"
+                                             : "\(a.imageName)__\(a.regime)__low"
+            if let nr = await score(file) {
+                result.anchors[i].nrScore = nr
+                progress?(String(format: "  %@/%@/%@  NR %.4f", a.imageName, a.regime, a.kind, nr))
+            }
+        }
+        for i in result.rows.indices {
+            let r = result.rows[i]
+            if let nr = await score("\(r.imageName)__\(r.regime)__\(r.method)") {
+                result.rows[i].nrScore = nr
+                progress?(String(format: "  %@/%@/%@  NR %.4f", r.imageName, r.regime, r.method, nr))
+            }
+        }
     }
 
     /// The classical arms. **Bicubic sits below Lanczos on purpose** — if the two are indistinguishable on
@@ -313,9 +460,67 @@ public enum UpscaleQualityBench {
         return image.cropping(to: rect)
     }
 
+    /// Produce the low-res input for a regime.
+    ///
+    /// 🔑 **`jpeg` is bicubic-down *then* a lossy round trip**, in that order. Compressing the 4K master
+    /// first and then downsampling would average most of the artefact away — the downsample is a
+    /// low-pass filter, and it would quietly restore the very thing the regime exists to test.
     static func downsample(_ image: CGImage, to side: Int, regime: String) -> CGImage? {
-        regime == "lanczos" ? (try? lanczosMPS(image, targetSide: side))
-                            : resampleCG(image, side: side, quality: .high)
+        switch regime {
+        case "lanczos": return try? lanczosMPS(image, targetSide: side)
+        case "jpeg":
+            guard let small = resampleCG(image, side: side, quality: .high) else { return nil }
+            return jpegRoundTrip(small, quality: jpegQuality)
+        default: return resampleCG(image, side: side, quality: .high)
+        }
+    }
+
+    /// Encode to JPEG at `quality` and decode back — a real codec round trip, so the damage is real
+    /// blocking/ringing/chroma-subsampling and not a simulation of it.
+    static func jpegRoundTrip(_ image: CGImage, quality: Double) -> CGImage? {
+        let data = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(data, "public.jpeg" as CFString, 1, nil)
+        else { return nil }
+        CGImageDestinationAddImage(dest, image,
+                                   [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary)
+        guard CGImageDestinationFinalize(dest),
+              let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        return CGImageSourceCreateImageAtIndex(source, 0, nil)
+    }
+
+    /// Mean gradient magnitude on luma — **an amount of high-frequency content, not a quality score.**
+    ///
+    /// Central differences, Rec.709 luma, interior pixels only. It exists because V10's two defensible
+    /// orderings disagreed on exactly this axis: SSIMULACRA2 ranked Lanczos first and SeedVR2 last while
+    /// gradient ranked them in the opposite order, and neither is wrong — one measures *agreement with
+    /// the reference*, the other measures *how much detail is present at all*. ⚠️ Resolution-dependent:
+    /// only compare figures computed at the same pixel side.
+    public static func meanGradient(_ image: CGImage) -> Double {
+        let w = image.width, h = image.height
+        guard w > 2, h > 2 else { return .nan }
+        var bytes = [UInt8](repeating: 0, count: w * h * 4)
+        guard let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let ctx = CGContext(data: &bytes, width: w, height: h, bitsPerComponent: 8,
+                                  bytesPerRow: w * 4, space: space,
+                                  bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)
+        else { return .nan }
+        ctx.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+
+        var luma = [Double](repeating: 0, count: w * h)
+        for i in 0..<(w * h) {
+            let p = i * 4
+            luma[i] = 0.2126 * Double(bytes[p]) + 0.7152 * Double(bytes[p + 1]) + 0.0722 * Double(bytes[p + 2])
+        }
+        var total = 0.0
+        for y in 1..<(h - 1) {
+            for x in 1..<(w - 1) {
+                let i = y * w + x
+                let dx = luma[i + 1] - luma[i - 1]
+                let dy = luma[i + w] - luma[i - w]
+                total += (dx * dx + dy * dy).squareRoot() * 0.5
+            }
+        }
+        return total / Double((w - 2) * (h - 2))
     }
 
     /// CoreGraphics `.high` interpolation — bicubic-class. Used for the bicubic arm *and* the bicubic
@@ -370,42 +575,121 @@ public enum UpscaleQualityBench {
 
     // MARK: - Reporting
 
-    /// Per-image rows first, then per-class means. **Never the grand mean alone** — the whole hypothesis
-    /// is that photo and graphic behave differently, so an average across them would hide the finding.
-    public static func report(_ rows: [UpscaleQualityRow]) -> [String] {
-        guard !rows.isEmpty else { return ["V10-Q — no rows produced"] }
-        var lines = ["V10-Q — SSIMULACRA2 vs a lossless 2048² reference, 512→2048 (×4)"]
+    /// Per-image rows first, then per-class means, **for each oracle separately**.
+    ///
+    /// 🚨 **Never the grand mean alone** — the whole hypothesis is that photo and graphic behave
+    /// differently, so an average across them would hide the finding. 🚨 **And never one oracle alone:**
+    /// the full-reference and no-reference tables are printed as three separate blocks per regime
+    /// (fidelity, no-reference, detail) precisely so a reader has to see where they disagree. Any future
+    /// edit that fuses them into a single "quality" column is deleting the result, not tidying it.
+    public static func report(_ result: UpscaleQualityResult) -> [String] {
+        guard !result.rows.isEmpty else { return ["V10-Q — no rows produced"] }
+        var lines = ["V10-Q — two oracles + the detail axis, 512→2048 (×4) vs a lossless 2048² reference",
+                     "        FR = SSIMULACRA2 (full-reference, higher better, ~90 = visually fine)",
+                     "        NR = SigLIP2 NR-IQA (no-reference, 0–1, high = clean / restoration does not pay)",
+                     "        grad = mean gradient magnitude (detail PRESENT, not detail CORRECT)"]
 
-        let methods = Array(Set(rows.map(\.method))).sorted()
-        for regime in ["bicubic", "lanczos"] {
-            let inRegime = rows.filter { $0.regime == regime }
-            guard !inRegime.isEmpty else { continue }
+        let methods = Array(Set(result.rows.map(\.method))).sorted()
+        let width = 14
+
+        func table(_ title: String,
+                   _ inRegime: [UpscaleQualityRow],
+                   _ format: @Sendable (UpscaleQualityRow) -> String?) {
             lines.append("")
-            lines.append("  ── degradation: \(regime) ──")
-            lines.append("    " + "image".padding(toLength: 22, withPad: " ", startingAt: 0)
-                         + methods.map { $0.padding(toLength: 14, withPad: " ", startingAt: 0) }.joined())
+            lines.append("    \(title)")
+            lines.append("      " + "image".padding(toLength: 22, withPad: " ", startingAt: 0)
+                         + methods.map { $0.padding(toLength: width, withPad: " ", startingAt: 0) }.joined())
             for name in Array(Set(inRegime.map(\.imageName))).sorted() {
-                var row = "    " + name.padding(toLength: 22, withPad: " ", startingAt: 0)
+                var row = "      " + name.padding(toLength: 22, withPad: " ", startingAt: 0)
                 for method in methods {
                     let cell = inRegime.first { $0.imageName == name && $0.method == method }
-                    row += (cell.map { String(format: "%.2f", $0.score) } ?? "—")
-                        .padding(toLength: 14, withPad: " ", startingAt: 0)
+                    row += (cell.flatMap(format) ?? "—").padding(toLength: width, withPad: " ", startingAt: 0)
                 }
                 lines.append(row)
             }
             for contentClass in ["photo", "graphic"] {
                 let subset = inRegime.filter { $0.contentClass == contentClass }
                 guard !subset.isEmpty else { continue }
-                var row = "    " + "MEAN \(contentClass)".padding(toLength: 22, withPad: " ", startingAt: 0)
+                var row = "      " + "MEAN \(contentClass)".padding(toLength: 22, withPad: " ", startingAt: 0)
                 for method in methods {
-                    let scores = subset.filter { $0.method == method }.map(\.score)
-                    row += (scores.isEmpty ? "—"
-                            : String(format: "%.2f", scores.reduce(0, +) / Double(scores.count)))
-                        .padding(toLength: 14, withPad: " ", startingAt: 0)
+                    let values = subset.filter { $0.method == method }.compactMap { cell -> Double? in
+                        guard let text = format(cell) else { return nil }
+                        return Double(text)
+                    }
+                    row += (values.isEmpty ? "—"
+                            : String(format: "%.4f", values.reduce(0, +) / Double(values.count)))
+                        .padding(toLength: width, withPad: " ", startingAt: 0)
                 }
                 lines.append(row)
             }
         }
+
+        for regime in allRegimes {
+            let inRegime = result.rows.filter { $0.regime == regime }
+            guard !inRegime.isEmpty else { continue }
+            lines.append("")
+            lines.append("  ══ degradation: \(regime)"
+                         + (regime == "jpeg" ? String(format: " (q=%.2f — real artefact, a correct answer EXISTS)", jpegQuality)
+                                             : " (clean downsample — nothing to undo)") + " ══")
+
+            table("── FULL-REFERENCE · SSIMULACRA2 ──", inRegime) { String(format: "%.2f", $0.score) }
+            table("── NO-REFERENCE · SigLIP2 NR-IQA ──", inRegime) { $0.nrScore.map { String(format: "%.4f", $0) } }
+            table("── DETAIL · mean gradient magnitude ──", inRegime) { String(format: "%.4f", $0.gradient) }
+
+            // The anchors belong under their regime: they are what the columns above are relative to.
+            let refAnchors = result.anchors.filter { $0.kind == "reference" }
+            let lowAnchors = result.anchors.filter { $0.kind == "low-input" && $0.regime == regime }
+            if !refAnchors.isEmpty || !lowAnchors.isEmpty {
+                lines.append("")
+                lines.append("    ── ANCHORS (not methods — the ceiling and the floor) ──")
+                lines.append("      " + "image".padding(toLength: 22, withPad: " ", startingAt: 0)
+                             + "ref NR".padding(toLength: width, withPad: " ", startingAt: 0)
+                             + "ref grad".padding(toLength: width, withPad: " ", startingAt: 0)
+                             + "low NR".padding(toLength: width, withPad: " ", startingAt: 0)
+                             + "low grad(512²)".padding(toLength: width + 2, withPad: " ", startingAt: 0))
+                for name in Array(Set(inRegime.map(\.imageName))).sorted() {
+                    let reference = refAnchors.first { $0.imageName == name }
+                    let low = lowAnchors.first { $0.imageName == name }
+                    lines.append("      " + name.padding(toLength: 22, withPad: " ", startingAt: 0)
+                        + (reference?.nrScore.map { String(format: "%.4f", $0) } ?? "—").padding(toLength: width, withPad: " ", startingAt: 0)
+                        + (reference.map { String(format: "%.4f", $0.gradient) } ?? "—").padding(toLength: width, withPad: " ", startingAt: 0)
+                        + (low?.nrScore.map { String(format: "%.4f", $0) } ?? "—").padding(toLength: width, withPad: " ", startingAt: 0)
+                        + (low.map { String(format: "%.4f", $0.gradient) } ?? "—"))
+                }
+            }
+        }
+
+        // ⚠️ Stated, not left to the reader: whether the two oracles picked the same winner. This is the
+        // one derived number in the receipt, and it is a COUNT OF DISAGREEMENTS, never a blend.
+        lines.append("")
+        lines.append("  ══ do the two oracles agree on a winner? ══")
+        var agree = 0, disagree = 0, undecidable = 0
+        for regime in allRegimes {
+            for contentClass in ["photo", "graphic"] {
+                let subset = result.rows.filter { $0.regime == regime && $0.contentClass == contentClass }
+                guard !subset.isEmpty else { continue }
+                func best(_ value: @Sendable (UpscaleQualityRow) -> Double?) -> String? {
+                    var totals: [String: (sum: Double, n: Int)] = [:]
+                    for row in subset {
+                        guard let v = value(row) else { continue }
+                        let t = totals[row.method] ?? (0, 0)
+                        totals[row.method] = (t.sum + v, t.n + 1)
+                    }
+                    return totals.max { ($0.value.sum / Double($0.value.n)) < ($1.value.sum / Double($1.value.n)) }?.key
+                }
+                let fr = best { $0.score }
+                let nr = best { $0.nrScore }
+                let detail = best { $0.gradient }
+                let verdict: String
+                if let fr, let nr { verdict = fr == nr ? "AGREE" : "DISAGREE"; if fr == nr { agree += 1 } else { disagree += 1 } }
+                else { verdict = "n/a (NR pass did not run)"; undecidable += 1 }
+                lines.append("    \(regime)/\(contentClass): FR→\(fr ?? "—")  NR→\(nr ?? "—")  detail→\(detail ?? "—")   \(verdict)")
+            }
+        }
+        lines.append("    totals: \(agree) agree · \(disagree) disagree · \(undecidable) undecidable")
+        lines.append("    ⚠️ A disagreement is a RESULT, not an error to resolve. FR asks 'is this the same")
+        lines.append("       image?', NR asks 'does this look like a good image?' — on super-resolution those")
+        lines.append("       are different questions and the honest answer reports both.")
         return lines
     }
 }

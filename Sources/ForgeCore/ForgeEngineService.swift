@@ -22,6 +22,7 @@ import MLXNAFNet
 import MLXRealESRGAN
 import MLXSeedVR2
 import MLXBiRefNet
+import MLXSigLIP2IQA
 import MLXDDColor
 import MLXInpaint
 import MLXSEARAFT
@@ -29,7 +30,7 @@ import MLXEdgeTAM
 
 let log = Logger(subsystem: "com.xocialize.ForgeCore", category: "ForgeCore")
 
-/// The eight model packages Forge registers. One case per registration, *not* per capability —
+/// The nine model packages Forge registers. One case per registration, *not* per capability —
 /// Optimize alone uses two (restore + upscale), and one flow registration feeds four consumers.
 ///
 /// 🔑 **`upscale` and `upscaleQuality` are two registrations behind ONE capability**, which is the
@@ -37,6 +38,15 @@ let log = Logger(subsystem: "com.xocialize.ForgeCore", category: "ForgeCore")
 /// fast tier, SeedVR2-3B the quality tier, and the planner picks. Adding SeedVR2 does **not** displace
 /// Real-ESRGAN — `MODEL-CATALOG.md`'s standing rule is that when SeedVR2 isn't viable (memory, chip,
 /// file) `videoUpscale` routes to per-frame Real-ESRGAN: *same tool, lighter backer.*
+///
+/// 🚨 **`qualityScore` is not a transform — it is the second oracle, and it is here because its absence
+/// was a measurable defect.** `CLAUDE.md`'s standing rule is *two* oracles: SigLIP2 NR-IQA gates
+/// **whether to restore** (no reference needed on a degraded source), SSIMULACRA2 gates **how hard to
+/// compress** (full-reference). ForgeCore linked only the second, so every comparison it could express
+/// was a fidelity comparison — and V10 paid for that: a full-reference metric penalises a *generative*
+/// upscaler for inventing plausible-but-different detail more than it penalises an interpolator for
+/// inventing none, which ranked Lanczos above both learned tiers while the detail ordering was exactly
+/// inverted. **The two oracles disagree by construction. Report both; never average them.**
 public enum ForgeModel: String, CaseIterable, Sendable {
     case restore        // NAFNet
     case upscale        // Real-ESRGAN — the fast tier
@@ -46,6 +56,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
     case inpaint        // LaMa / MI-GAN
     case flow           // SEA-RAFT
     case promptMask     // EdgeTAM
+    case qualityScore   // SigLIP2 NR-IQA — the no-reference oracle, not a transform
 
     public var modelName: String {
         switch self {
@@ -57,6 +68,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .inpaint:    return "LaMa / MI-GAN"
         case .flow:       return "SEA-RAFT"
         case .promptMask: return "EdgeTAM"
+        case .qualityScore: return "SigLIP2-IQA"
         }
     }
 
@@ -75,6 +87,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .inpaint:    return .imageInpaint
         case .flow:       return .opticalFlow
         case .promptMask: return .promptSegment
+        case .qualityScore: return .imageQualityScore
         }
     }
 }
@@ -177,7 +190,7 @@ public final class ForgeEngineService {
 
     // MARK: - Registration
 
-    /// Register all seven packages, recording each outcome. Registration is cheap: it runs the license
+    /// Register every package, recording each outcome. Registration is cheap: it runs the license
     /// and device-eligibility gates only; weights load lazily on the first `run`.
     public func registerAll() async {
         var results: [RegistrationOutcome] = []
@@ -254,6 +267,17 @@ public final class ForgeEngineService {
             case .promptMask:
                 id = try await engine.register(EdgeTAMPackage.registration,
                                                configuration: EdgeTAMConfiguration())
+            case .qualityScore:
+                // `maxPatches` is a coverage/cost knob, not a quality knob: the scorer mean-pools up to
+                // N native-scale 224² patches. ⚠️ **The default 8 is too few for a 2048² frame** — 8
+                // patches of 224² cover 401 k of 4.19 M pixels, under a tenth of the image, and which
+                // tenth is then a sampling artefact rather than a property of the upscaler. 32 covers
+                // ~38% and keeps the run sub-second. Stated here because a no-reference score that
+                // silently looked at 10% of the picture would be exactly the kind of plausible wrong
+                // number V10 exists to catch.
+                let patches = ProcessInfo.processInfo.environment["FORGE_IQA_PATCHES"].flatMap(Int.init) ?? 32
+                id = try await engine.register(SigLIP2IQAPackage.registration,
+                                               configuration: SigLIP2IQAConfiguration(maxPatches: patches))
             }
             packageIDs[model] = id
             return RegistrationOutcome(model: model, packageID: id, failure: nil)

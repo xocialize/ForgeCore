@@ -41,8 +41,16 @@ let package = Package(
         .package(url: "https://github.com/xocialize/mlx-nafnet-swift.git", from: "0.4.0"),
         .package(url: "https://github.com/xocialize/mlx-realesrgan-swift.git", from: "0.5.0"),
     // The quality tier behind `imageUpscale` — a second backer, not a replacement.
-    .package(url: "https://github.com/xocialize/mlx-seedvr2-swift.git", from: "0.7.2"),
+    .package(url: "https://github.com/xocialize/mlx-seedvr2-swift.git", from: "0.7.3"),
         .package(url: "https://github.com/xocialize/mlx-birefnet-swift.git", from: "0.4.0"),
+        // 🔑 **The no-reference half of the two-oracle rule** (`CLAUDE.md`: *"SigLIP2 NR-IQA gates
+        // whether to restore … SSIMULACRA2 gates how hard to compress"*). ForgeCore shipped the
+        // full-reference oracle only (MediaMeasure, via media-bridge), which made every quality
+        // comparison a fidelity comparison by default — and V10 measured the cost of that: a
+        // full-reference metric structurally penalises a generative upscaler for inventing
+        // plausible-but-different detail more than it penalises an interpolator for inventing
+        // nothing. Both oracles must be linkable here or the rule cannot be honoured by a consumer.
+        .package(url: "https://github.com/xocialize/mlx-siglip2-iqa-swift.git", from: "0.3.0"),
         .package(url: "https://github.com/xocialize/mlx-ddcolor-swift.git", from: "0.2.0"),
         .package(url: "https://github.com/xocialize/mlx-lama-swift.git", from: "0.2.0"),
         .package(url: "https://github.com/xocialize/mlx-sea-raft-swift.git", from: "0.5.0"),
@@ -64,6 +72,7 @@ let package = Package(
                 .product(name: "MLXRealESRGAN", package: "mlx-realesrgan-swift"),
                 .product(name: "MLXSeedVR2", package: "mlx-seedvr2-swift"),
                 .product(name: "MLXBiRefNet", package: "mlx-birefnet-swift"),
+                .product(name: "MLXSigLIP2IQA", package: "mlx-siglip2-iqa-swift"),
                 .product(name: "MLXDDColor", package: "mlx-ddcolor-swift"),
                 .product(name: "MLXInpaint", package: "mlx-lama-swift"),
                 .product(name: "MLXSEARAFT", package: "mlx-sea-raft-swift"),

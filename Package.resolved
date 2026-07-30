@@ -1,5 +1,5 @@
 {
-  "originHash" : "9f63dd816341a82a8bb92219d6c8cba3b4dcd8b89d82318dafeed4217644648e",
+  "originHash" : "8e80990a9ad9feb63c2b1b3be966fb33624f5244e4ed4107d247b720278f6df0",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -150,8 +150,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-realesrgan-swift.git",
       "state" : {
-        "revision" : "2daa35f1960beb619b1de0e2e8bb74104f681b4c",
-        "version" : "0.5.0"
+        "revision" : "9e2e1a9da859f782f21a52984a92092656f555ee",
+        "version" : "0.6.0"
       }
     },
     {
@@ -168,8 +168,17 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-seedvr2-swift.git",
       "state" : {
-        "revision" : "708533b076d04860632f1fae9bccd9125dd4e582",
-        "version" : "0.7.2"
+        "revision" : "402681bacccf6e70de084db00a99ec301f40b508",
+        "version" : "0.7.3"
+      }
+    },
+    {
+      "identity" : "mlx-siglip2-iqa-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/xocialize/mlx-siglip2-iqa-swift.git",
+      "state" : {
+        "revision" : "44785cb0b6b433112c98f1b724f67d18fe7b6152",
+        "version" : "0.3.0"
       }
     },
     {
