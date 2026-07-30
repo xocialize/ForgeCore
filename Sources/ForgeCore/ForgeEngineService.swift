@@ -20,6 +20,7 @@ import MLXServeCore
 import MLXToolKit
 import MLXNAFNet
 import MLXRealESRGAN
+import MLXSeedVR2
 import MLXBiRefNet
 import MLXDDColor
 import MLXInpaint
@@ -28,11 +29,18 @@ import MLXEdgeTAM
 
 let log = Logger(subsystem: "com.xocialize.ForgeCore", category: "ForgeCore")
 
-/// The seven model packages Forge registers. One case per registration, *not* per capability —
+/// The eight model packages Forge registers. One case per registration, *not* per capability —
 /// Optimize alone uses two (restore + upscale), and one flow registration feeds four consumers.
+///
+/// 🔑 **`upscale` and `upscaleQuality` are two registrations behind ONE capability**, which is the
+/// engine's multi-package-per-`PackageID` pattern and the first place Forge uses it: Real-ESRGAN is the
+/// fast tier, SeedVR2-3B the quality tier, and the planner picks. Adding SeedVR2 does **not** displace
+/// Real-ESRGAN — `MODEL-CATALOG.md`'s standing rule is that when SeedVR2 isn't viable (memory, chip,
+/// file) `videoUpscale` routes to per-frame Real-ESRGAN: *same tool, lighter backer.*
 public enum ForgeModel: String, CaseIterable, Sendable {
     case restore        // NAFNet
-    case upscale        // Real-ESRGAN
+    case upscale        // Real-ESRGAN — the fast tier
+    case upscaleQuality // SeedVR2-3B (int8) — the quality tier, same capability
     case matte          // BiRefNet
     case colorize       // DDColor
     case inpaint        // LaMa / MI-GAN
@@ -43,6 +51,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         switch self {
         case .restore:    return "NAFNet"
         case .upscale:    return "Real-ESRGAN"
+        case .upscaleQuality: return "SeedVR2-3B"
         case .matte:      return "BiRefNet"
         case .colorize:   return "DDColor"
         case .inpaint:    return "LaMa / MI-GAN"
@@ -57,6 +66,10 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         switch self {
         case .restore:    return .imageRestore
         case .upscale:    return .imageUpscale
+        // ⚠️ Deliberately `.imageUpscale`, not `.videoUpscale`. The package declares BOTH contracts, and
+        // the still path is the one Forge's upscale surface consumes today. Its video contract stays
+        // available for a clip-level seam (`CLAUDE.md` V4c) that no app wires yet.
+        case .upscaleQuality: return .imageUpscale
         case .matte:      return .matting
         case .colorize:   return .imageColorize
         case .inpaint:    return .imageInpaint
@@ -199,6 +212,11 @@ public final class ForgeEngineService {
             case .upscale:
                 id = try await engine.register(RealESRGANUpscalePackage.registration,
                                                configuration: RealESRGANConfiguration(variant: .general))
+            case .upscaleQuality:
+                // int8 by default: the fp16 repo exists but the port's own configuration notes record
+                // fp16 collapsing to ~22.7 dB, so int8 is the shipping quant, not a compromise.
+                id = try await engine.register(SeedVR2UpscalePackage.registration,
+                                               configuration: SeedVR2Configuration(quant: .int8))
             case .matte:
                 id = try await engine.register(BiRefNetPackage.registration,
                                                configuration: BiRefNetConfiguration())

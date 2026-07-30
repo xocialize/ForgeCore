@@ -1,5 +1,5 @@
 {
-  "originHash" : "711364aee73769cae3f4f9156fcfe2e58ffcb35621d258ff5704a96bcc00b074",
+  "originHash" : "26fb1f16988352b0241058e49338741e3c25e6bee50423e831dfafa52680975a",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -161,6 +161,15 @@
       "state" : {
         "revision" : "316a13edfe9d5430f8f7ee167960cd64b788d621",
         "version" : "0.5.0"
+      }
+    },
+    {
+      "identity" : "mlx-seedvr2-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/xocialize/mlx-seedvr2-swift.git",
+      "state" : {
+        "revision" : "fa9d6cb0574594c624d4f6e8968591f3e32f41fc",
+        "version" : "0.6.1"
       }
     },
     {

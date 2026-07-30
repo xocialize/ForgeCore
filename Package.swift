@@ -40,6 +40,8 @@ let package = Package(
         // Model wrappers — the heavy pins.
         .package(url: "https://github.com/xocialize/mlx-nafnet-swift.git", from: "0.4.0"),
         .package(url: "https://github.com/xocialize/mlx-realesrgan-swift.git", from: "0.5.0"),
+    // The quality tier behind `imageUpscale` — a second backer, not a replacement.
+    .package(url: "https://github.com/xocialize/mlx-seedvr2-swift.git", from: "0.6.1"),
         .package(url: "https://github.com/xocialize/mlx-birefnet-swift.git", from: "0.4.0"),
         .package(url: "https://github.com/xocialize/mlx-ddcolor-swift.git", from: "0.2.0"),
         .package(url: "https://github.com/xocialize/mlx-lama-swift.git", from: "0.2.0"),
@@ -60,6 +62,7 @@ let package = Package(
                 .product(name: "MLXToolKit", package: "mlx-engine-swift"),
                 .product(name: "MLXNAFNet", package: "mlx-nafnet-swift"),
                 .product(name: "MLXRealESRGAN", package: "mlx-realesrgan-swift"),
+                .product(name: "MLXSeedVR2", package: "mlx-seedvr2-swift"),
                 .product(name: "MLXBiRefNet", package: "mlx-birefnet-swift"),
                 .product(name: "MLXDDColor", package: "mlx-ddcolor-swift"),
                 .product(name: "MLXInpaint", package: "mlx-lama-swift"),
