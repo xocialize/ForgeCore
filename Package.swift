@@ -31,7 +31,7 @@ let package = Package(
         .package(url: "https://github.com/xocialize/ColorizeKit.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/EraseKit.git", from: "0.2.0"),
         .package(url: "https://github.com/xocialize/MaskKit.git", from: "0.1.0"),
-        .package(url: "https://github.com/xocialize/media-bridge.git", from: "0.9.1"),
+        .package(url: "https://github.com/xocialize/media-bridge.git", from: "0.11.0"),
 
         // The engine. v0.37.0 is the FIRST tag carrying `licenseEnforcement` (contract 1.28.0) —
         // do not lower this floor, or `.blocking` silently stops being expressible.
@@ -41,7 +41,7 @@ let package = Package(
         .package(url: "https://github.com/xocialize/mlx-nafnet-swift.git", from: "0.4.0"),
         .package(url: "https://github.com/xocialize/mlx-realesrgan-swift.git", from: "0.6.2"),
     // The quality tier behind `imageUpscale` — a second backer, not a replacement.
-    .package(url: "https://github.com/xocialize/mlx-seedvr2-swift.git", from: "0.7.6"),
+    .package(url: "https://github.com/xocialize/mlx-seedvr2-swift.git", from: "0.8.0"),
         .package(url: "https://github.com/xocialize/mlx-birefnet-swift.git", from: "0.4.0"),
         // 🔑 **The no-reference half of the two-oracle rule** (`CLAUDE.md`: *"SigLIP2 NR-IQA gates
         // whether to restore … SSIMULACRA2 gates how hard to compress"*). ForgeCore shipped the

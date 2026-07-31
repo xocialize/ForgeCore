@@ -84,9 +84,11 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         switch self {
         case .restore:    return .imageRestore
         case .upscale:    return .imageUpscale
-        // ⚠️ Deliberately `.imageUpscale`, not `.videoUpscale`. The package declares BOTH contracts, and
-        // the still path is the one Forge's upscale surface consumes today. Its video contract stays
-        // available for a clip-level seam (`CLAUDE.md` V4c) that no app wires yet.
+        // ⚠️ This registration backs BOTH `.imageUpscale` and `.videoUpscale` — one package, one model
+        // load, two declared contracts. `capability` reports `.imageUpscale` because its only job is to
+        // bind a progress view to the download/prepare of that single model; it is not a routing
+        // decision. ✅ The video contract IS wired as of 2026-07-31 — see `EngineVideoUpscaler` and
+        // `videoTemporalTier` (the earlier "no app wires yet" note is retired).
         case .upscaleQuality: return .imageUpscale
         case .matte:      return .matting
         case .colorize:   return .imageColorize
@@ -96,6 +98,36 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .qualityScore: return .imageQualityScore
         }
     }
+}
+
+/// The one user-facing dial for the video quality tier: how many frames are processed jointly.
+///
+/// 🔑 **Counter-intuitively, more frames is CHEAPER per frame as well as more coherent** — measured
+/// 3.27 s/frame at T=9 against 4.10–4.68 s at T=1 through the full shipping path (`GAP-PROGRAM.md`
+/// V12-D). Coherence is a discount here, not a trade, so `.default` is the right default.
+///
+/// 🚨 **This dial does NOT control memory. Output geometry does.** SeedVR2's streaming banks are
+/// allocated **per spatial tile position** (~0.82 GiB each, roughly constant in T), so a larger output
+/// frame costs more regardless of the tier — and lowering the tier will NOT rescue a frame that is too
+/// big. Measured: one 256² output tile ≈ 11.93 GiB at `.default`; nine tile positions (512² output)
+/// ≈ 18.0 GiB. **A 16 GB machine runs `.default` at preview-sized outputs, not at real content**;
+/// larger-memory machines run it on real content today. Bank offload/eviction is the open work that
+/// would extend it downmarket (`ForgeCore/REQUIREMENTS.md`).
+///
+/// ⚠️ The tier is a **ceiling, not a guarantee**: the driver clamps the effective window down its
+/// measured ladder using the engine-stamped `availableBudgetBytes` and the clip's geometry.
+public enum VideoTemporalTier: Int, Sendable, CaseIterable {
+    /// Per-frame, no temporal joining — the pre-v0.8.0 behaviour, bit-identical to it.
+    case off = 1
+    /// Steady-state chunks carry only one latent frame; measured the weakest of the three T>1 rungs.
+    case conservative = 5
+    /// The recommended tier. Best measured coherence-per-cost.
+    case `default` = 9
+    /// Highest coherence, highest bank pressure.
+    case max = 13
+
+    /// The `temporalWindow` value handed to `SeedVR2Configuration`.
+    public var temporalWindow: Int { rawValue }
 }
 
 /// What happened when a package was registered. A failure here is a fact worth showing, not an error to
@@ -157,6 +189,11 @@ public final class ForgeEngineService {
     /// not denoising** on DSLR content. Different corpus, different metric, same verdict.
     public let restoreVariant: NAFNetVariant
 
+    /// How many frames SeedVR2's video path processes jointly — the quality/cost dial for
+    /// `videoUpscale`. Higher = more temporally coherent AND (measured) cheaper per frame, but the
+    /// memory cost is driven by OUTPUT GEOMETRY, not by this number. See `VideoTemporalTier`.
+    public let videoTemporalTier: VideoTemporalTier
+
     /// - Parameters:
     ///   - policy: license gate. Leave at `.permissiveOnly` for a shipping product; a research build
     ///     may widen it.
@@ -164,9 +201,11 @@ public final class ForgeEngineService {
     ///   - restoreVariant: see `restoreVariant`. The default changed to `.signage` on evidence.
     public init(policy: LicensePolicy = .permissiveOnly,
                 enforcement: LicenseEnforcement = .blocking,
-                restoreVariant: NAFNetVariant = .signage) {
+                restoreVariant: NAFNetVariant = .signage,
+                videoTemporalTier: VideoTemporalTier = .default) {
         self.engine = MLXServeEngine(policy: policy, licenseEnforcement: enforcement)
         self.restoreVariant = restoreVariant
+        self.videoTemporalTier = videoTemporalTier
     }
 
     // MARK: - Model store
@@ -259,6 +298,7 @@ public final class ForgeEngineService {
                 id = try await engine.register(SeedVR2UpscalePackage.registration,
                                                configuration: SeedVR2Configuration(
                                                    quant: .int8,
+                                                   temporalWindow: videoTemporalTier.temporalWindow,
                                                    tileSize: tile,
                                                    tileOverlap: overlap,
                                                    tileHalo: halo,

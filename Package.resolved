@@ -1,5 +1,5 @@
 {
-  "originHash" : "230b48d937c38beaacce6318f4755ee5b30d2a7a8e5c4786077515aa0bef46c8",
+  "originHash" : "e2c6079097fc98400319f40d5050ecb86b2c83417f7ee31ebd401f5a4922cf8c",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -51,8 +51,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/frame-stream-native.git",
       "state" : {
-        "revision" : "a80c26ee171111a1badda17de19e5ebc1fc45a7d",
-        "version" : "0.3.0"
+        "revision" : "e71050be546102d25a502eda0aa6400422406104",
+        "version" : "0.4.0"
       }
     },
     {
@@ -78,8 +78,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/media-bridge.git",
       "state" : {
-        "revision" : "eaac3d8788315e33f8dc0436147f3c4ccada2a8f",
-        "version" : "0.10.0"
+        "revision" : "de92a8a7a5c2c695d5139c6a511aeaeabdd988d0",
+        "version" : "0.11.0"
       }
     },
     {
@@ -168,8 +168,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-seedvr2-swift.git",
       "state" : {
-        "revision" : "4385179e6265934df01cc3a23a005b67bda556bc",
-        "version" : "0.7.6"
+        "revision" : "e62e41d36af3535da821ca97e90c83b82cb279ae",
+        "version" : "0.8.0"
       }
     },
     {
