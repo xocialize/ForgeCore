@@ -8,10 +8,15 @@
 //  (SCUNet vs the shipping NAFNet `.signage`) decides the denoise default, THIS table is the single
 //  line that changes — no Kit edit, no app edit, and every receipt after it names the new backer.
 //
-//  ⚠️ **Interim table, recorded honestly (2026-07-31):**
-//  - `denoise` → NAFNet `.signage` — the INCUMBENT, kept per BRIDGE-066's "no default change".
-//    V4 measured SCUNet as the strongest blind denoiser on NIND, but against a *sibling* NAFNet
-//    checkpoint, not `.signage` — the head-to-head is exactly BRIDGE-069's job.
+//  ✅ **Table confirmed by measurement (BRIDGE-069, 2026-07-31 —
+//  `probes/r2_bridge069_restore_default.out`):**
+//  - `denoise` → NAFNet `.signage` — RE-CONFIRMED, not merely incumbent. The engine-path
+//    head-to-head: `.signage` TIES SCUNet at ISO1600 (+1.38 vs +1.40) and is **6–9 dB closer to a
+//    no-op on clean content**; SCUNet dominates only at heavy noise (+4.91 vs +2.25 at ISO6400,
+//    +8.25 vs +2.66 at ISO25600). The default must win where being wrong is costly, and that is
+//    clean content. SCUNet stays registered (`.denoiseBlind`) as the heavy-noise backer; **the
+//    per-source router that picks between them is T4's decision layer, not this table** — when T4
+//    lands, `denoise` routing becomes measurement-driven and this comment moves there.
 //  - `motionDeblur` → FFTformer — the dedicated motion deblurrer (fp32). ⚠️ C2's RealBlur result is
 //    weak for the whole class (every GoPro-trained method scored below the blurry input on real
 //    smartphone blur), so this routing is "best of the backers we hold", not "measured good".
@@ -34,7 +39,7 @@ public struct EngineFrameRestoreProvider: FrameRestoreProvider {
         self.engine = service.engine
         var t: [RestoreJob: (PackageID, String)] = [:]
         let routing: [(RestoreJob, ForgeModel)] = [
-            (.denoise, .restore),               // ⚠️ BRIDGE-069 decides this row
+            (.denoise, .restore),               // ✅ BRIDGE-069 re-confirmed .signage
             (.motionDeblur, .deblurMotion),
             (.defocusDeblur, .restormerDefocus),
         ]
