@@ -79,13 +79,26 @@ struct EngineImageCodingTests {
         #expect(decoded.height == 3)
     }
 
-    /// Every model must map to a distinct capability-and-name pair; a duplicate would mean two
-    /// registrations silently competing for one capability.
+    /// Every registration must have a distinct NAME. Capabilities are deliberately NOT unique.
+    ///
+    /// ⚠️ **This test used to assert one capability per model, and that assertion was wrong** — it
+    /// encoded the opposite of the architecture. The engine supports **multiple packages per
+    /// capability, selected by `PackageID`**, and Forge relies on it: `.upscale` (Real-ESRGAN, fast)
+    /// and `.upscaleQuality` (SeedVR2-3B, quality) both back `.imageUpscale` on purpose. The old
+    /// assertion also hard-coded a count of 7 that fell out of date when those two rows landed, so it
+    /// had been failing rather than protecting anything.
+    ///
+    /// What actually needs protecting is that no two registrations share a *name* — that would make
+    /// `RegistrationOutcome` ambiguous in a UI — and that every case really is registerable.
     @Test("model table is consistent")
     func modelTableIsConsistent() {
         let models = ForgeModel.allCases
-        #expect(models.count == 7)
+        #expect(models.count == 9)
         #expect(Set(models.map(\.modelName)).count == models.count)
-        #expect(Set(models.map(\.capability)).count == models.count)
+        #expect(Set(models.map(\.rawValue)).count == models.count)
+        // Capability sharing is intentional and load-bearing: assert the tier pair specifically, so a
+        // future refactor that accidentally splits them fails here rather than silently changing routing.
+        #expect(ForgeModel.upscale.capability == .imageUpscale)
+        #expect(ForgeModel.upscaleQuality.capability == .imageUpscale)
     }
 }
