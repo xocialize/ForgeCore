@@ -48,6 +48,9 @@ let package = Package(
         .package(url: "https://github.com/xocialize/mlx-cidnet-swift.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/mlx-gfpgan-swift.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/mlx-restoreformer-swift.git", from: "0.1.0"),
+        // Category A Kit — RestoreTier2 is the provider-protocol seam this package implements
+        // (BRIDGE-070). One-way: the Kit never depends back on ForgeCore.
+        .package(url: "https://github.com/xocialize/ForgeRestoreKit.git", from: "0.10.0"),
         .package(url: "https://github.com/xocialize/mlx-realesrgan-swift.git", from: "0.7.0"),
     // The quality tier behind `imageUpscale` — a second backer, not a replacement.
     .package(url: "https://github.com/xocialize/mlx-seedvr2-swift.git", from: "0.9.1"),
@@ -85,6 +88,7 @@ let package = Package(
                 .product(name: "MLXCIDNet", package: "mlx-cidnet-swift"),
                 .product(name: "MLXGFPGAN", package: "mlx-gfpgan-swift"),
                 .product(name: "MLXRestoreFormer", package: "mlx-restoreformer-swift"),
+                .product(name: "RestoreTier2", package: "ForgeRestoreKit"),
                 .product(name: "MLXRealESRGAN", package: "mlx-realesrgan-swift"),
                 .product(name: "MLXSeedVR2", package: "mlx-seedvr2-swift"),
                 .product(name: "MLXBiRefNet", package: "mlx-birefnet-swift"),

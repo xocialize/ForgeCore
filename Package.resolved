@@ -1,5 +1,5 @@
 {
-  "originHash" : "a82361558b1ed08a7073707a43bbc63c8e959595e853b93a0dbf3f8835f870dd",
+  "originHash" : "8c8ceeef5e71a6a5cdf9c0659772b54483f054bd5921518a0c6c1e8acdd896e7",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -44,6 +44,24 @@
       "state" : {
         "revision" : "ab7c56f7217d00d21e70d8bfda6040cb5f614d13",
         "version" : "0.4.0"
+      }
+    },
+    {
+      "identity" : "forgepixelbridge",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/xocialize/ForgePixelBridge.git",
+      "state" : {
+        "revision" : "7a54c673ab2af48fdadebca03b989bb299f65889",
+        "version" : "0.1.0"
+      }
+    },
+    {
+      "identity" : "forgerestorekit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/xocialize/ForgeRestoreKit.git",
+      "state" : {
+        "revision" : "e61822b46998693127878a93073b54ef3083878a",
+        "version" : "0.10.0"
       }
     },
     {
