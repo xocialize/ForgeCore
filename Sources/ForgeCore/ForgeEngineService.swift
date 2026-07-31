@@ -19,6 +19,13 @@ import OSLog
 import MLXServeCore
 import MLXToolKit
 import MLXNAFNet
+import MLXFFTformer
+import MLXRestormer
+import MLXDRUNet
+import MLXSCUNet
+import MLXCIDNet
+import MLXGFPGAN
+import MLXRestoreFormer
 import MLXRealESRGAN
 import MLXSeedVR2
 import MLXBiRefNet
@@ -64,6 +71,21 @@ public enum ForgeModel: String, CaseIterable, Sendable {
     case promptMask     // EdgeTAM
     case qualityScore   // SigLIP2 NR-IQA — the no-reference oracle, not a transform
 
+    // ── The frame-restore wave (BRIDGE-066), face pair (064-face) and relight (BRIDGE-067) ──
+    // Registered 2026-07-31. Until then ForgeCore registered nine models while the fleet held
+    // sixteen — every case below was a shipped, parity-gated package invisible to every app.
+    // ⚠️ NONE of these change a default: NAFNet `.signage` remains the restore chain's backer
+    // until BRIDGE-069 measures the head-to-head. Registration makes them REACHABLE, not chosen.
+    case deblurMotion      // FFTformer (fp32 — bf16 measured 30 dB of dtype error; ships fp32)
+    case restormerMotion   // Restormer .motionDeblur
+    case restormerDefocus  // Restormer .defocusDeblur — the only shippable defocus deblur (C4)
+    case restormerDenoise  // Restormer .realDenoise
+    case denoiseStrength   // DRUNet — THE strength dial (σ as a continuous input; contract 1.30.0)
+    case denoiseBlind      // SCUNet .realPSNR — V4's strongest blind denoiser (GAN variant deliberately unregistered: no-op at ISO1600, never a default)
+    case relight           // HVI-CIDNet — first `imageRelight` backer; luma gate is IN-PACKAGE, ForgeCore must not second-guess it
+    case faceRestore       // GFPGAN v1.4
+    case faceRestoreVQ     // RestoreFormer++ — the VQ-dictionary sibling
+
     public var modelName: String {
         switch self {
         case .restore:    return "NAFNet"
@@ -75,6 +97,15 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .flow:       return "SEA-RAFT"
         case .promptMask: return "EdgeTAM"
         case .qualityScore: return "SigLIP2-IQA"
+        case .deblurMotion:     return "FFTformer"
+        case .restormerMotion:  return "Restormer (motion)"
+        case .restormerDefocus: return "Restormer (defocus)"
+        case .restormerDenoise: return "Restormer (denoise)"
+        case .denoiseStrength:  return "DRUNet"
+        case .denoiseBlind:     return "SCUNet"
+        case .relight:          return "HVI-CIDNet"
+        case .faceRestore:      return "GFPGAN"
+        case .faceRestoreVQ:    return "RestoreFormer++"
         }
     }
 
@@ -96,6 +127,10 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .flow:       return .opticalFlow
         case .promptMask: return .promptSegment
         case .qualityScore: return .imageQualityScore
+        case .deblurMotion, .restormerMotion, .restormerDefocus, .restormerDenoise,
+             .denoiseStrength, .denoiseBlind, .faceRestore, .faceRestoreVQ:
+            return .imageRestore
+        case .relight: return .imageRelight
         }
     }
 }
@@ -344,6 +379,43 @@ public final class ForgeEngineService {
             case .matte:
                 id = try await engine.register(BiRefNetPackage.registration,
                                                configuration: BiRefNetConfiguration())
+            case .deblurMotion:
+                id = try await engine.register(FFTformerRestorePackage.registration,
+                                               configuration: FFTformerConfiguration())
+            // Restormer: ONE package, THREE registrations — the variant is a Configuration knob, so
+            // each behaviour needs its own PackageID to be individually reachable/preparable
+            // (BRIDGE-066 asked that the mechanism be recorded: it is per-registration config,
+            // exactly the multi-package-per-capability pattern `upscale`/`upscaleQuality` set).
+            case .restormerMotion:
+                id = try await engine.register(RestormerRestorePackage.registration,
+                                               configuration: RestormerConfiguration(variant: .motionDeblur))
+            case .restormerDefocus:
+                id = try await engine.register(RestormerRestorePackage.registration,
+                                               configuration: RestormerConfiguration(variant: .defocusDeblur))
+            case .restormerDenoise:
+                id = try await engine.register(RestormerRestorePackage.registration,
+                                               configuration: RestormerConfiguration(variant: .realDenoise))
+            case .denoiseStrength:
+                id = try await engine.register(DRUNetRestorePackage.registration,
+                                               configuration: DRUNetConfiguration())
+            case .denoiseBlind:
+                // .realPSNR only — V4 measured the GAN variant 0.9–1.5 dB behind and a no-op at
+                // ISO1600. It stays selectable via configuration if a perceptual surface ever wants
+                // it; it does not get a registration until something measures a use for one.
+                id = try await engine.register(SCUNetRestorePackage.registration,
+                                               configuration: SCUNetConfiguration(variant: .realPSNR))
+            case .relight:
+                // Package defaults on purpose (BRIDGE-067: "take the package's default variant; do
+                // not choose one in ForgeCore"). The luma gate lives in-package — a correctly-dark
+                // input coming back unmodified is the CONTRACT, not a failure.
+                id = try await engine.register(CIDNetRelightPackage.registration,
+                                               configuration: CIDNetConfiguration())
+            case .faceRestore:
+                id = try await engine.register(GFPGANRestorePackage.registration,
+                                               configuration: GFPGANConfiguration())
+            case .faceRestoreVQ:
+                id = try await engine.register(RestoreFormerRestorePackage.registration,
+                                               configuration: RestoreFormerConfiguration())
             case .colorize:
                 id = try await engine.register(DDColorPackage.registration,
                                                configuration: DDColorConfiguration())

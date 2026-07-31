@@ -1,5 +1,5 @@
 {
-  "originHash" : "0b56173a7a83367da5580033f915840fee0759e5c546fb5b4533ab9f25087766",
+  "originHash" : "a82361558b1ed08a7073707a43bbc63c8e959595e853b93a0dbf3f8835f870dd",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -92,12 +92,30 @@
       }
     },
     {
+      "identity" : "mlx-cidnet-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/xocialize/mlx-cidnet-swift.git",
+      "state" : {
+        "revision" : "d6ce05d53c56231c6bfabde15c0c66beeb03e7ca",
+        "version" : "0.1.0"
+      }
+    },
+    {
       "identity" : "mlx-ddcolor-swift",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-ddcolor-swift.git",
       "state" : {
         "revision" : "cc4afae5adb52380c8aeaf6f58d8b1b763946a38",
         "version" : "0.2.0"
+      }
+    },
+    {
+      "identity" : "mlx-drunet-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/xocialize/mlx-drunet-swift.git",
+      "state" : {
+        "revision" : "9bf3751536c523358be6666775de76e1572b6d46",
+        "version" : "0.1.0"
       }
     },
     {
@@ -116,6 +134,24 @@
       "state" : {
         "revision" : "6bed83fab8f6849cebdd991a7a16456c3a764ce9",
         "version" : "0.40.1"
+      }
+    },
+    {
+      "identity" : "mlx-fftformer-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/xocialize/mlx-fftformer-swift.git",
+      "state" : {
+        "revision" : "9385513c5d54e3f9ea818ad750b6439a2edceadd",
+        "version" : "0.1.1"
+      }
+    },
+    {
+      "identity" : "mlx-gfpgan-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/xocialize/mlx-gfpgan-swift.git",
+      "state" : {
+        "revision" : "c8582091242c1ae8ab7a5f876c3023d9e13df040",
+        "version" : "0.1.0"
       }
     },
     {
@@ -152,6 +188,33 @@
       "state" : {
         "revision" : "f28e58a5393513f526e8f8dca66fcd2db8fdb13d",
         "version" : "0.7.0"
+      }
+    },
+    {
+      "identity" : "mlx-restoreformer-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/xocialize/mlx-restoreformer-swift.git",
+      "state" : {
+        "revision" : "ba5c39b03e91c9c648922c4397b9652dc9ce9a18",
+        "version" : "0.1.0"
+      }
+    },
+    {
+      "identity" : "mlx-restormer-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/xocialize/mlx-restormer-swift.git",
+      "state" : {
+        "revision" : "dd691429439b6996915f00ba3205c29b79aeec8d",
+        "version" : "0.1.0"
+      }
+    },
+    {
+      "identity" : "mlx-scunet-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/xocialize/mlx-scunet-swift.git",
+      "state" : {
+        "revision" : "dfc7f888f6bbfe76c02315ea8a5ff0b574d9a3a0",
+        "version" : "0.1.1"
       }
     },
     {

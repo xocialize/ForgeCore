@@ -39,6 +39,15 @@ let package = Package(
 
         // Model wrappers — the heavy pins.
         .package(url: "https://github.com/xocialize/mlx-nafnet-swift.git", from: "0.4.0"),
+        // The frame-restore wave (BRIDGE-066) + face pair (064-face) + relight (BRIDGE-067) —
+        // registered 2026-07-31, ending the state where shipped packages were invisible to apps.
+        .package(url: "https://github.com/xocialize/mlx-fftformer-swift.git", from: "0.1.1"),
+        .package(url: "https://github.com/xocialize/mlx-restormer-swift.git", from: "0.1.0"),
+        .package(url: "https://github.com/xocialize/mlx-drunet-swift.git", from: "0.1.0"),
+        .package(url: "https://github.com/xocialize/mlx-scunet-swift.git", from: "0.1.1"),
+        .package(url: "https://github.com/xocialize/mlx-cidnet-swift.git", from: "0.1.0"),
+        .package(url: "https://github.com/xocialize/mlx-gfpgan-swift.git", from: "0.1.0"),
+        .package(url: "https://github.com/xocialize/mlx-restoreformer-swift.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/mlx-realesrgan-swift.git", from: "0.7.0"),
     // The quality tier behind `imageUpscale` — a second backer, not a replacement.
     .package(url: "https://github.com/xocialize/mlx-seedvr2-swift.git", from: "0.9.1"),
@@ -69,6 +78,13 @@ let package = Package(
                 .product(name: "MLXServeCore", package: "mlx-engine-swift"),
                 .product(name: "MLXToolKit", package: "mlx-engine-swift"),
                 .product(name: "MLXNAFNet", package: "mlx-nafnet-swift"),
+                .product(name: "MLXFFTformer", package: "mlx-fftformer-swift"),
+                .product(name: "MLXRestormer", package: "mlx-restormer-swift"),
+                .product(name: "MLXDRUNet", package: "mlx-drunet-swift"),
+                .product(name: "MLXSCUNet", package: "mlx-scunet-swift"),
+                .product(name: "MLXCIDNet", package: "mlx-cidnet-swift"),
+                .product(name: "MLXGFPGAN", package: "mlx-gfpgan-swift"),
+                .product(name: "MLXRestoreFormer", package: "mlx-restoreformer-swift"),
                 .product(name: "MLXRealESRGAN", package: "mlx-realesrgan-swift"),
                 .product(name: "MLXSeedVR2", package: "mlx-seedvr2-swift"),
                 .product(name: "MLXBiRefNet", package: "mlx-birefnet-swift"),

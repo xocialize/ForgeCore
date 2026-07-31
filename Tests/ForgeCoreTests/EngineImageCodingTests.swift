@@ -93,12 +93,23 @@ struct EngineImageCodingTests {
     @Test("model table is consistent")
     func modelTableIsConsistent() {
         let models = ForgeModel.allCases
-        #expect(models.count == 9)
+        // ⚠️ Not a hard-coded total — that assertion has now gone stale TWICE (at 7, then at 9,
+        // which failed the moment BRIDGE-066/067 registered the frame-restore wave). The doc
+        // comment above already named the lesson; this line finally applies it. A floor still
+        // catches accidental case deletion without re-failing on every legitimate addition.
+        #expect(models.count >= 18)
         #expect(Set(models.map(\.modelName)).count == models.count)
         #expect(Set(models.map(\.rawValue)).count == models.count)
         // Capability sharing is intentional and load-bearing: assert the tier pair specifically, so a
         // future refactor that accidentally splits them fails here rather than silently changing routing.
         #expect(ForgeModel.upscale.capability == .imageUpscale)
         #expect(ForgeModel.upscaleQuality.capability == .imageUpscale)
+        // The BRIDGE-066 wave: eight imageRestore backers total (NAFNet + wave + faces), one relight.
+        let restoreBackers = models.filter { $0.capability == .imageRestore }
+        #expect(restoreBackers.count == 9)
+        #expect(ForgeModel.relight.capability == .imageRelight)
+        // Restormer is ONE package, THREE registrations — distinct cases, distinct display names.
+        let restormers: [ForgeModel] = [.restormerMotion, .restormerDefocus, .restormerDenoise]
+        #expect(Set(restormers.map(\.modelName)).count == 3)
     }
 }
