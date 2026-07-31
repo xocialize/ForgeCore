@@ -170,21 +170,32 @@ as the planned fix since V12-D — does NOT clear it:**
 | 720p ×2 | 84 | 64.2 GiB |
 | **HD→4K (3840×2160)** | **170** | **130.0 GiB** |
 
-Under the **current chunk-major ordering** offload would move 130 GiB to disk and back *every chunk*
-(~9 frames) — ~29 GiB/frame of I/O against ~3.3 s/frame of compute, a ~2.7× slowdown. int8 tails only
-halve it.
+✅ **SHIPPED 2026-07-31 — bank eviction** (`mlx-seedvr2-swift` v0.9.0, ForgeCore ≥ 0.9.0). Set
+`ForgeEngineService.bankResidencyBudgetBytes` (or `FORGE_SEEDVR2_BANK_BUDGET`) and banks over the budget
+round-trip through a scratch directory **bit-identically**. That turns the table above from a hard
+ceiling into a cost: predicted peak becomes `base + min(extra banks, budget)`, which
+`videoUpscaleFits(outputTilePositions:budgetBytes:bankResidencyBudgetBytes:)` models and
+`bankBudgetToFit` inverts — so a host can offer "run it with eviction" instead of a refusal.
 
-🔑 **The fix is offload AND loop order** (`GAP-PROGRAM.md` V12-B, scoped, **not built**) — and to be
-precise, because an earlier revision of this section got it wrong: **loop order alone saves nothing.**
-`banks` is an N-entry array that persists across chunks, and under tile-major iteration each tile's bank
-must still persist across a *segment* boundary, so peak is O(positions) in both orderings. Offload is
-what makes peak resident banks 1; the interchange is what makes offload affordable, cutting traffic from
-2N banks per chunk to 2N per segment (~7×, i.e. ~25% overhead at 4K instead of 2.7×). ⚠️ Offload works
-at all only because the engine caps the MLX buffer cache — freed buffers beyond the cap return to the
-OS rather than parking in the pool.
+🔑 **Cost: ~6–13% wall clock, and INDEPENDENT of output size.** Per tile position per output frame the
+model costs 0.363 s (V12-D: 3.27 s/frame at 9 positions, 0.335 at one — linear within 8%) against
+~0.19 s of bank round-trip at this machine's measured 8.74 GB/s fsync'd write. Both terms scale with
+tile count, so the ratio does not grow with the frame.
 
-**Until that lands, the honest ceiling for the quality tier is ~9 tile positions (512² output) on
-16 GB**, which is exactly what `videoUpscaleFits` gates on.
+🚨 **An earlier revision of this section put that cost at 2.7× and concluded offload could not work.**
+It compared bank I/O at 170 tile positions against a compute figure measured at 9. Compute scales with
+tile count too. That error is why this was scoped as a loop-order restructure; tile-major iteration
+would still amortise the I/O ~7× further, but it is a refinement now, not the enabler.
+
+⚠️ **The real price is write volume, not latency** — roughly 800 GiB of scratch for a 10 s SD ×2 clip.
+Eviction is **off by default** and is how a machine runs a job it otherwise could not; a machine with
+headroom should leave it unset and write nothing. ⚠️ It also only moves `phys_footprint` because the
+engine caps the MLX buffer cache — freed buffers beyond the cap go back to the OS rather than parking
+in the pool.
+
+**Un-evicted, the ceiling for the quality tier is ~9 tile positions (512² output) on 16 GB.** With a
+bank budget set, SD ×2 (35 positions) fits inside 14 GiB — which is the case the two named customer
+segments actually need.
 ⚠️ Still owed: the ByteDance multi-frame golden (no reference parity oracle for T>1 output values).
 
 **Real-ESRGAN — see the warning above.** Sub-second per frame at SD. Tiled path is 128/8 since 0.7.0 — 4.65× faster than the old 64/8 at 8192² output, and the seam the old geometry had is gone (see the tiling note above).

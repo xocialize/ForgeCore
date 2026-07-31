@@ -42,11 +42,12 @@ extension ForgeEngineService {
 
     /// Upscale a whole clip through the SeedVR2 temporal path.
     ///
-    /// 🚨 **Check `canRunVideoUpscale(outputTilePositions:)` before offering this on a small-memory
-    /// machine.** The temporal path's memory is driven by OUTPUT GEOMETRY — streaming banks are
-    /// allocated per spatial tile position, ~0.82 GiB each and roughly constant in the temporal window —
-    /// so a big frame is expensive at every tier and **lowering `videoTemporalTier` will not rescue it**
-    /// (`GAP-PROGRAM.md` V12-D). The driver clamps what it can, but the honest gate is up front.
+    /// 🚨 **Check `videoUpscaleFits(outputTilePositions:budgetBytes:bankResidencyBudgetBytes:)` before
+    /// offering this on a small-memory machine.** The temporal path's memory is driven by OUTPUT
+    /// GEOMETRY — streaming banks are allocated per spatial tile position, ~0.765 GiB each and constant
+    /// in the temporal window — so a big frame is expensive at every tier and **lowering
+    /// `videoTemporalTier` will not rescue it** (`GAP-PROGRAM.md` V12-D/V12-B). What *does* rescue it is
+    /// `bankResidencyBudgetBytes`; `bankBudgetToFit` turns a refusal into the budget that would work.
     ///
     /// - Parameter scale: `nil` uses the package's default (2). Only 2 and 4 are accepted.
     public func upscaleVideo(_ video: Video, scale: Int? = nil) async throws -> VideoUpscaleOutcome {
@@ -91,22 +92,26 @@ extension ForgeEngineService {
     ///   larger tails. ⚠️ Note this is the *opposite* of the Real-ESRGAN t128 result; different
     ///   mechanism, do not carry the conclusion across packages.
     ///
-    /// 🚨 **Nor does bank offload, which was the planned fix.** Sized at the product's own targets the
-    /// requirement is `positions × 0.765 GiB`: 512² → 6.9 GiB, SD ×2 → 26.8 GiB, **HD→4K → 170 tile
-    /// positions = 130.0 GiB of banks alone**, which does not fit the 137 GB dev machine, let alone
-    /// 16 GB. Offloading that would move 130 GiB to disk and back every chunk; int8 tails only halve it.
+    /// ✅ **What DOES work is bank eviction, and it shipped** (`mlx-seedvr2-swift` v0.9.0). Un-evicted,
+    /// the requirement is `positions × 0.765 GiB`: 512² → 6.9 GiB, SD ×2 → 26.8 GiB, **HD→4K → 170 tile
+    /// positions = 130.0 GiB of banks alone**. Set `ForgeEngineService.bankResidencyBudgetBytes` and
+    /// everything over the budget round-trips through scratch **bit-identically**, so this gate's
+    /// prediction drops to `base + min(extra banks, budget)` — which is what the
+    /// `bankResidencyBudgetBytes` parameter here models, and `bankBudgetToFit` inverts.
     ///
-    /// 🔑 **The fix is offload AND loop order** (`GAP-PROGRAM.md` V12-B — scoped, **not built**), and
-    /// the ordering of that sentence matters because an earlier revision of this comment claimed loop
-    /// order alone was enough. It is not: `banks` is an N-entry array that persists across chunks, and
-    /// under tile-major iteration each tile's bank must still persist across a *segment* boundary, so
-    /// **peak is O(positions) in both orderings**. Offload is what makes peak resident banks 1; the
-    /// interchange is what makes offload affordable, cutting traffic from 2N banks per chunk to 2N per
-    /// segment (≈7×, i.e. ~25% overhead at 4K rather than 2.7×). ⚠️ And offload only moves
-    /// `phys_footprint` at all because the engine caps the MLX buffer cache — freed buffers beyond the
-    /// cap go back to the OS instead of parking in the pool.
+    /// 🔑 **Why it is affordable, and 🚨 why an earlier revision of this comment said it was not.** That
+    /// revision put the cost at 2.7× and called offload unusable; it compared bank I/O at 170 tile
+    /// positions against a compute figure measured at 9. **Compute scales with tile count too**, so the
+    /// ratio is output-size-independent: per tile position per output frame the model costs 0.363 s
+    /// (V12-D, linear within 8%) against ~0.19 s of round-trip at this machine's measured 8.74 GB/s —
+    /// **~6–13% wall clock at any output size**. Tile-major iteration would amortise the I/O ~7× further
+    /// and is now a refinement rather than the enabler it was scoped as.
     ///
-    /// Until it lands, this gate is the honest answer and ~9 tile positions is the 16 GB ceiling.
+    /// ⚠️ **The real price is write volume, not latency** — roughly 800 GiB of scratch for a 10 s SD ×2
+    /// clip. Eviction is off by default and should be offered where the alternative is not running at
+    /// all, never as a blanket optimisation. ⚠️ It also only moves `phys_footprint` because the engine
+    /// caps the MLX buffer cache; freed buffers beyond the cap return to the OS rather than parking in
+    /// the pool.
     ///
     /// - Parameter outputTilePositions: tile positions the output frame will occupy —
     ///   `ceil(outW / step) * ceil(outH / step)` for the configured tile size and overlap
@@ -115,13 +120,48 @@ extension ForgeEngineService {
     ///   if you have it; otherwise a fraction of physical memory the app is comfortable occupying.
     /// - Returns: whether it fits, and the predicted peak — so a UI can explain a refusal with a number
     ///   instead of greying a control out silently.
-    public static func videoUpscaleFits(outputTilePositions: Int,
-                                        budgetBytes: UInt64) -> (fits: Bool, predictedBytes: UInt64) {
+    ///
+    /// 🔑 `nonisolated`: this is arithmetic over measured constants, and a host may well want to gate
+    /// from a background context before touching the main actor.
+    nonisolated public static func videoUpscaleFits(
+        outputTilePositions: Int,
+        budgetBytes: UInt64,
+        bankResidencyBudgetBytes: Int? = nil
+    ) -> (fits: Bool, predictedBytes: UInt64) {
         // Measured single-tile peak at the default tier, and the per-extra-tile bank term.
         let singleTileBytes: Double = 11.93 * 1024 * 1024 * 1024
         let perTileBankBytes: Double = 0.82 * 1024 * 1024 * 1024
         let extra = Double(max(0, outputTilePositions - 1))
-        let predicted = UInt64(singleTileBytes + extra * perTileBankBytes)
+
+        // With eviction on, resident banks are capped: the excess spills instead of accumulating.
+        // ⚠️ The cap applies to the EXTRA banks only — the active tile's own state is inside
+        // `singleTileBytes`, so a budget of 0 is still a valid, fully-spilling configuration.
+        let extraBankBytes: Double
+        if let cap = bankResidencyBudgetBytes {
+            extraBankBytes = min(extra * perTileBankBytes, Double(max(0, cap)))
+        } else {
+            extraBankBytes = extra * perTileBankBytes
+        }
+        let predicted = UInt64(singleTileBytes + extraBankBytes)
         return (predicted <= budgetBytes, predicted)
+    }
+
+    /// The bank residency budget that would make a given geometry fit — the inverse of the gate, so a
+    /// host can turn "this does not fit" into "run it with eviction at N bytes" rather than a refusal.
+    ///
+    /// Returns `nil` if the geometry cannot fit at any budget (the base residency alone exceeds
+    /// `budgetBytes`), which is an honest "no" rather than a budget that would still OOM.
+    ///
+    /// ⚠️ **A returned budget is not free.** Every byte of bank over it round-trips through scratch once
+    /// per chunk — ~6–13% wall clock, and write volume in the hundreds of GiB for a real clip. Offer it
+    /// where the alternative is not running at all.
+    nonisolated public static func bankBudgetToFit(outputTilePositions: Int,
+                                       budgetBytes: UInt64) -> Int? {
+        let singleTileBytes: Double = 11.93 * 1024 * 1024 * 1024
+        guard Double(budgetBytes) > singleTileBytes else { return nil }
+        let perTileBankBytes: Double = 0.82 * 1024 * 1024 * 1024
+        let extra = Double(max(0, outputTilePositions - 1))
+        let headroom = Double(budgetBytes) - singleTileBytes
+        return Int(min(extra * perTileBankBytes, headroom))
     }
 }

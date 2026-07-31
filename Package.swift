@@ -41,7 +41,7 @@ let package = Package(
         .package(url: "https://github.com/xocialize/mlx-nafnet-swift.git", from: "0.4.0"),
         .package(url: "https://github.com/xocialize/mlx-realesrgan-swift.git", from: "0.7.0"),
     // The quality tier behind `imageUpscale` — a second backer, not a replacement.
-    .package(url: "https://github.com/xocialize/mlx-seedvr2-swift.git", from: "0.8.0"),
+    .package(url: "https://github.com/xocialize/mlx-seedvr2-swift.git", from: "0.9.0"),
         .package(url: "https://github.com/xocialize/mlx-birefnet-swift.git", from: "0.4.0"),
         // 🔑 **The no-reference half of the two-oracle rule** (`CLAUDE.md`: *"SigLIP2 NR-IQA gates
         // whether to restore … SSIMULACRA2 gates how hard to compress"*). ForgeCore shipped the

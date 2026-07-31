@@ -111,8 +111,13 @@ public enum ForgeModel: String, CaseIterable, Sendable {
 /// frame costs more regardless of the tier — and lowering the tier will NOT rescue a frame that is too
 /// big. Measured: one 256² output tile ≈ 11.93 GiB at `.default`; nine tile positions (512² output)
 /// ≈ 18.0 GiB. **A 16 GB machine runs `.default` at preview-sized outputs, not at real content**;
-/// larger-memory machines run it on real content today. Bank offload/eviction is the open work that
-/// would extend it downmarket (`ForgeCore/REQUIREMENTS.md`).
+/// larger-memory machines run it on real content today.
+///
+/// ✅ **Bank offload/eviction SHIPPED 2026-07-31** (`mlx-seedvr2-swift` v0.9.0) and is what extends this
+/// downmarket: set `ForgeEngineService.bankResidencyBudgetBytes` and banks over the budget round-trip
+/// through scratch bit-identically, at ~6–13% wall clock independent of output size. ⚠️ Off by default,
+/// because the real price is write volume (~800 GiB of scratch for a 10 s SD ×2 clip) — it is how a
+/// machine runs a job it otherwise could not, not a blanket optimisation.
 ///
 /// ⚠️ The tier is a **ceiling, not a guarantee**: the driver clamps the effective window down its
 /// measured ladder using the engine-stamped `availableBudgetBytes` and the clip's geometry.
@@ -194,18 +199,37 @@ public final class ForgeEngineService {
     /// memory cost is driven by OUTPUT GEOMETRY, not by this number. See `VideoTemporalTier`.
     public let videoTemporalTier: VideoTemporalTier
 
+    /// Byte budget for RESIDENT per-tile streaming banks on the video path. `nil` (default) keeps
+    /// every bank in memory, which is the behaviour every measurement to date describes.
+    ///
+    /// 🔑 **This is the knob that lets the quality tier exceed ~9 tile positions.** Bank residency is
+    /// `tilePositions × ~0.765 GiB` (`GAP-PROGRAM.md` V12-B) — 6.9 GiB at a 512² output but 26.8 GiB at
+    /// SD ×2, more than a 16 GB machine has. Set a budget and the excess round-trips through a scratch
+    /// directory **bit-identically**, at ~6–13% wall clock — a cost that is independent of output size,
+    /// because bank I/O and model compute both scale with tile count.
+    ///
+    /// ⚠️ **Do not set this as a blanket optimisation.** The real price is write volume — roughly
+    /// 800 GiB of scratch for a 10 s SD ×2 clip. It is how a machine runs a job it otherwise could not;
+    /// a machine with the headroom should leave it `nil` and write nothing. Use
+    /// `videoUpscaleFits(outputTilePositions:budgetBytes:bankResidencyBudgetBytes:)` to decide.
+    public let bankResidencyBudgetBytes: Int?
+
     /// - Parameters:
     ///   - policy: license gate. Leave at `.permissiveOnly` for a shipping product; a research build
     ///     may widen it.
     ///   - enforcement: leave `.blocking`. See the note on `engine`.
     ///   - restoreVariant: see `restoreVariant`. The default changed to `.signage` on evidence.
+    ///   - bankResidencyBudgetBytes: see the property. `nil` keeps every bank resident.
     public init(policy: LicensePolicy = .permissiveOnly,
                 enforcement: LicenseEnforcement = .blocking,
                 restoreVariant: NAFNetVariant = .signage,
-                videoTemporalTier: VideoTemporalTier = .default) {
+                videoTemporalTier: VideoTemporalTier = .default,
+                bankResidencyBudgetBytes: Int? = nil) {
         self.engine = MLXServeEngine(policy: policy, licenseEnforcement: enforcement)
         self.restoreVariant = restoreVariant
         self.videoTemporalTier = videoTemporalTier
+        self.bankResidencyBudgetBytes = bankResidencyBudgetBytes
+            ?? ProcessInfo.processInfo.environment["FORGE_SEEDVR2_BANK_BUDGET"].flatMap(Int.init)
     }
 
     // MARK: - Model store
@@ -313,7 +337,8 @@ public final class ForgeEngineService {
                                                    tileSize: tile,
                                                    tileOverlap: overlap,
                                                    tileHalo: halo,
-                                                   imageWholeFramePixels: wholeFrame))
+                                                   imageWholeFramePixels: wholeFrame,
+                                                   bankResidencyBudgetBytes: bankResidencyBudgetBytes))
             case .matte:
                 id = try await engine.register(BiRefNetPackage.registration,
                                                configuration: BiRefNetConfiguration())
