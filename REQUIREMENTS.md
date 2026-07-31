@@ -144,12 +144,35 @@ out the two obvious workarounds.** The bank is `CausalConv3d`'s retained tail, w
 full spatial extent, so bank bytes scale with tile *area* and `positions × area` is simply the output
 area: **≈ 13.4 KB of retained tail per output pixel**, invariant to tiling.
 - ❌ **Lowering T does not help** — tails are ~constant in T (784 MiB across the ladder, measured).
-- ❌ **Enlarging the tile does not help** — fewer tiles, proportionally larger tails. *(Mechanism read
-  from the port's slicing code, not yet measured; falsifiable in one run — `FORGE_SEEDVR2_TILE=512` at
-  fixed output size, compare peak.)* ⚠️ Note this is the opposite of the Real-ESRGAN result above,
-  where enlarging the tile was a pure win. Different mechanism, do not carry the conclusion across.
-- ✅ **Bank offload/eviction is the live lever** — tails are touched once per chunk boundary and are
-  pure carry-over state, the profile that pages out cleanly.
+- ❌ **Enlarging the tile does not help** — fewer tiles, proportionally larger tails. ⚠️ Note this is
+  the opposite of the Real-ESRGAN result above, where enlarging the tile was a pure win. Different
+  mechanism, do not carry the conclusion across.
+
+✅ **Both of the above are now CI-enforced**, not remembered: `VAEStreamingBankSizeTests` in
+`mlx-seedvr2-swift` pins the law at shipping precision — 57 tails, all bfloat16,
+`12525·s² + 1024·s + 1536` bytes, **0.765 GiB per 256² tile position**, within 7% of the V12-D
+process-footprint number by a completely different method.
+
+🚨 **Sized at the product's real targets, this is a hard ceiling, and `bank offload/eviction` — carried
+as the planned fix since V12-D — does NOT clear it:**
+
+| output | tile positions | banks alone |
+|---|---|---|
+| 256² | 1 | 0.8 GiB |
+| 512² | 9 | 6.9 GiB |
+| SD ×2 (1440×960) | 35 | 26.8 GiB |
+| 720p ×2 | 84 | 64.2 GiB |
+| **HD→4K (3840×2160)** | **170** | **130.0 GiB** |
+
+At 4K, offload would move 130 GiB to disk and back **every chunk**; int8 tails only halve it. The
+planned fix was a *mechanism* answer to what is actually a *complexity-class* problem.
+
+🔑 **The fix is loop order** (`GAP-PROGRAM.md` V12-B, scoped, **not built**). Banks are per-position only
+because the driver iterates chunk-major, so every bank must survive a full pass. Each tile position is
+an independent causal stream — that is why banks exist — so tile-major iteration holds **one** live
+bank, 0.765 GiB, at any output size, trading O(positions) bank memory for O(segment) frame memory
+(~24 MB/frame at 4K). **Until that lands, the honest ceiling for the quality tier is ~9 tile positions
+(512² output) on 16 GB**, which is exactly what `videoUpscaleFits` gates on.
 ⚠️ Still owed: the ByteDance multi-frame golden (no reference parity oracle for T>1 output values).
 
 **Real-ESRGAN — see the warning above.** Sub-second per frame at SD. Tiled path is 128/8 since 0.7.0 — 4.65× faster than the old 64/8 at 8192² output, and the seam the old geometry had is gone (see the tiling note above).

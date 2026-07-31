@@ -83,17 +83,25 @@ extension ForgeEngineService {
     /// bank bytes scale with tile *area*, and `positions × area` is just the output area. Restated
     /// honestly: **≈ 13.4 KB of retained tail per output pixel**, invariant to how the frame is cut up.
     ///
-    /// ⚠️ **Therefore neither knob a reader will reach for first actually works:**
-    /// - **Lowering `videoTemporalTier` does not help** — the tails are ~constant in T (measured, V12-S:
-    ///   784 MiB across the ladder).
+    /// ⚠️ **Therefore neither knob a reader will reach for first actually works**, and both are now
+    /// CI-enforced by `VAEStreamingBankSizeTests` in `mlx-seedvr2-swift` rather than left as prose:
+    /// - **Lowering `videoTemporalTier` does not help** — the tails are constant in T by construction
+    ///   (`memoryFrames = kernel − stride`), which V12-S also measured at 784 MiB across the ladder.
     /// - **Changing the tile size does not help either** — fewer, larger tiles hold proportionally
-    ///   larger tails. *(Mechanism read from the port's own slicing code, not yet measured. It is one
-    ///   run to falsify: set `FORGE_SEEDVR2_TILE=512` at a fixed output size and compare peak. If total
-    ///   bank bytes move more than a few percent, this note is wrong and the sweep is worth doing.)*
+    ///   larger tails. ⚠️ Note this is the *opposite* of the Real-ESRGAN t128 result; different
+    ///   mechanism, do not carry the conclusion across packages.
     ///
-    /// 🔑 **What is left is bank offload/eviction** — the tails are touched once per chunk boundary and
-    /// are pure carry-over state, which is exactly the profile that survives being paged out. That is
-    /// the item standing between the quality tier and a 16 GB machine on real content.
+    /// 🚨 **Nor does bank offload, which was the planned fix.** Sized at the product's own targets the
+    /// requirement is `positions × 0.765 GiB`: 512² → 6.9 GiB, SD ×2 → 26.8 GiB, **HD→4K → 170 tile
+    /// positions = 130.0 GiB of banks alone**, which does not fit the 137 GB dev machine, let alone
+    /// 16 GB. Offloading that would move 130 GiB to disk and back every chunk; int8 tails only halve it.
+    ///
+    /// 🔑 **The fix is loop order** (`GAP-PROGRAM.md` V12-B — scoped, **not built**). Banks are
+    /// per-position only because the driver iterates chunk-major, so each bank must survive a full pass.
+    /// Each tile position is an independent causal stream — that is why banks exist at all — so
+    /// tile-major iteration holds ONE live bank, 0.765 GiB, at any output size, trading O(positions)
+    /// bank memory for O(segment) frame memory. Until it lands, this gate is the honest answer and
+    /// ~9 tile positions is the 16 GB ceiling.
     ///
     /// - Parameter outputTilePositions: tile positions the output frame will occupy —
     ///   `ceil(outW / step) * ceil(outH / step)` for the configured tile size and overlap
