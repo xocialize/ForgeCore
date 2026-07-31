@@ -76,16 +76,37 @@ These come from `GAP-PROGRAM.md` V10 / V12 / V12-F receipts. All `phys_footprint
 
 **SeedVR2-3B int8 — video, temporal (T = frames per window)**
 
-| T | s/frame | peak | 16 GB machine |
-|---|---|---|---|
-| 1 | 0.329 | 8.21 GiB | ✅ comfortable |
-| **5** | **0.222** | **12.18 GiB** | ✅ **the 16 GB tier** |
-| 9 | 0.223 | 15.73 GiB | ⚠️ marginal |
-| 13 | 0.242 | 18.91 GiB | ❌ |
+🚨 **CORRECTED 2026-07-31. The first ladder published here was measured with an UNBOUNDED MLX buffer
+cache and overstated every rung by 40–70%.** At T=5 the 20.13 GiB figure decomposes as **5.21 GiB MLX
+active + 14.69 GiB MLX cache**; capping the cache at 2 GiB gives 9.85 GiB for identical output. The
+shipping engine *does* cap it — `PORT-QUEUE.md` cross-cutting note 3 has said *"set
+`GPU.set(cacheLimit:)`, never `memoryLimit`"* all along — so the uncapped numbers described a
+configuration the product never runs.
 
-🔑 **T=5 is both the cheapest per frame and the best on flicker** — an unusually clean choice.
-⚠️ **Not shippable yet:** independent windows produce boundary pops of 4–12× the content floor
-(`GAP-PROGRAM.md` V12-F). Streaming memory is the outstanding fix.
+Ladder as the product actually runs it (`GAP-PROGRAM.md` V12-S, streaming on, three measurements per
+rung):
+
+| T | s/frame | peak (capped) | superseded (uncapped) | 16 GB machine |
+|---|---|---|---|---|
+| 1 | — | **7.82 / 7.90 / 7.80 GiB** | 8.21 | ✅ |
+| 5 | — | **9.83 / 9.86 / 9.90 GiB** | 12.18 | ✅ |
+| **9** | **0.306** | **11.76 / 11.78 / 11.54 GiB** | 15.73 | ✅ **74% — the recommended tier** |
+| 13 | — | **13.47 / 13.57 / 13.65 GiB** | 18.91 ❌ | ✅ **84% — fits, was reported as not fitting** |
+
+🔑 **Every rung fits 16 GB, including T=13**, which the earlier row called impossible. Streaming's own
+cost is ~1.0–1.5 GiB over independent chunks; the retained tails are **784 MiB and constant in T**.
+
+**Recommended for a 16 GB machine: T=9 at 256² tiles** — 11.78 GiB (74%), boundary max |ΔL\*| 0.3071,
+0.306 s/frame. T=13 is better on quality and still fits at 84%, but that is a headroom call rather than
+a default. ⚠️ T=5 is now the *weakest* of the three: its steady-state chunks carry latT = 1.
+
+✅ **The chunk-boundary defect that blocked shipping is resolved, not merely reduced.** Boundary
+max |ΔL\*| 1.4089 → **0.3426** at T=5, and at every T the boundary max is now *smaller* than the
+interior max — the seam is no longer where the clip's worst frame pair lives. Chunked T>1 now beats
+T=1 on max|ΔL\*| (0.700/0.586/0.494 vs 0.851).
+
+⚠️ Still open: no reference parity oracle for T>1 output *values*; measured on one clip with no cuts,
+and **carrying memory across a scene cut is exactly wrong** — nothing detects one yet.
 
 **Real-ESRGAN — see the warning above.** Sub-second per frame at SD.
 
@@ -103,6 +124,11 @@ Aiarty publishes **no memory requirement at all** (§3c).
 
 - **Numbers here must come from a receipt in `mlxengine-todo/probes/`, with the row named.** No
   estimates, no extrapolation. If it was not measured, say "unmeasured".
+- 🚨 **State the measurement CONFIGURATION, not just the units.** Two separate basis errors have now
+  inflated numbers in this row: MLX peak read as the admission basis (under-reads ~2.5–2.9×), and an
+  **unbounded buffer cache** read as working set (over-reads 40–70%). Both looked like clean
+  measurements. A footprint is only meaningful with its cache policy stated — cap it the way the engine
+  does, and say that you did.
 - **Use `phys_footprint`, never MLX peak** — MLX peak under-reads the admission basis by ~2.5–2.9×,
   and that confusion has already produced one wrong "fits in 16 GB" claim (V12 §6).
 - **When a footprint is input-dependent, say so and give the range.** A single number for a function is
