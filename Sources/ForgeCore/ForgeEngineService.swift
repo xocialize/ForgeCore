@@ -30,6 +30,12 @@ import MLXEdgeTAM
 
 let log = Logger(subsystem: "com.xocialize.ForgeCore", category: "ForgeCore")
 
+/// 📄 **Machine requirements for every capability registered here: `REQUIREMENTS.md` at the package
+/// root** — footprints, backends, OS floors and the measured operating points, each citing a receipt.
+/// ⚠️ It opens with a live defect worth knowing before you size a machine: Real-ESRGAN's declared
+/// footprint (6.26 GB) is the *tiled* figure, while its default path is whole-frame and measures
+/// **21.24 GB at 1080p**. The governor admits against the declaration, not against reality.
+///
 /// The nine model packages Forge registers. One case per registration, *not* per capability —
 /// Optimize alone uses two (restore + upscale), and one flow registration feeds four consumers.
 ///
