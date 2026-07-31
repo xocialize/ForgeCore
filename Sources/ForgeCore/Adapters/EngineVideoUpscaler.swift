@@ -77,6 +77,24 @@ extension ForgeEngineService {
     /// prediction matched a 9-tile measurement (18.0 GiB) within 0.3 GiB, which is why this is offered
     /// as a gate rather than a guess.
     ///
+    /// 🚨 **"Per tile position" is a unit of convenience, not a mechanism — the underlying cost is per
+    /// OUTPUT PIXEL, and that closes off the obvious optimisation.** The bank is `CausalConv3d`'s
+    /// retained tail, `x[..., (T - memoryFrames)...]`, which keeps the tile's FULL spatial extent — so
+    /// bank bytes scale with tile *area*, and `positions × area` is just the output area. Restated
+    /// honestly: **≈ 13.4 KB of retained tail per output pixel**, invariant to how the frame is cut up.
+    ///
+    /// ⚠️ **Therefore neither knob a reader will reach for first actually works:**
+    /// - **Lowering `videoTemporalTier` does not help** — the tails are ~constant in T (measured, V12-S:
+    ///   784 MiB across the ladder).
+    /// - **Changing the tile size does not help either** — fewer, larger tiles hold proportionally
+    ///   larger tails. *(Mechanism read from the port's own slicing code, not yet measured. It is one
+    ///   run to falsify: set `FORGE_SEEDVR2_TILE=512` at a fixed output size and compare peak. If total
+    ///   bank bytes move more than a few percent, this note is wrong and the sweep is worth doing.)*
+    ///
+    /// 🔑 **What is left is bank offload/eviction** — the tails are touched once per chunk boundary and
+    /// are pure carry-over state, which is exactly the profile that survives being paged out. That is
+    /// the item standing between the quality tier and a 16 GB machine on real content.
+    ///
     /// - Parameter outputTilePositions: tile positions the output frame will occupy —
     ///   `ceil(outW / step) * ceil(outH / step)` for the configured tile size and overlap
     ///   (default 256/32 → step 224). A 256² output is 1; a 512² output is 9; SD ×2 is ~15.

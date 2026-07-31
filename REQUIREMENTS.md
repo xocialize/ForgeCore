@@ -135,9 +135,21 @@ positions (512² output): 17.95–18.16 GiB** — the per-tile model predicts it
 third instance of "a footprint is a function, not a constant": here it is a function of *output* area.
 - **≤256² output on 16 GB: T=9 quality tier works today.**
 - **Real content on 16 GB** (e.g. SD ×2 ≈ 15 tile positions ≈ ~12 GiB of banks alone): does NOT fit at
-  any T — clamping T does not shrink banks. Needs **bank offload/eviction or a per-geometry T table**
-  before the quality tier defaults on above tiny outputs; larger-memory machines run it today, which is
-  exactly the app-side capability gating the product intends.
+  any T — clamping T does not shrink banks. Needs **bank offload/eviction** before the quality tier
+  defaults on above tiny outputs; larger-memory machines run it today, which is exactly the app-side
+  capability gating the product intends.
+
+🚨 **"Per tile position" is a unit of convenience — the real unit is PER OUTPUT PIXEL, and that rules
+out the two obvious workarounds.** The bank is `CausalConv3d`'s retained tail, which keeps the tile's
+full spatial extent, so bank bytes scale with tile *area* and `positions × area` is simply the output
+area: **≈ 13.4 KB of retained tail per output pixel**, invariant to tiling.
+- ❌ **Lowering T does not help** — tails are ~constant in T (784 MiB across the ladder, measured).
+- ❌ **Enlarging the tile does not help** — fewer tiles, proportionally larger tails. *(Mechanism read
+  from the port's slicing code, not yet measured; falsifiable in one run — `FORGE_SEEDVR2_TILE=512` at
+  fixed output size, compare peak.)* ⚠️ Note this is the opposite of the Real-ESRGAN result above,
+  where enlarging the tile was a pure win. Different mechanism, do not carry the conclusion across.
+- ✅ **Bank offload/eviction is the live lever** — tails are touched once per chunk boundary and are
+  pure carry-over state, the profile that pages out cleanly.
 ⚠️ Still owed: the ByteDance multi-frame golden (no reference parity oracle for T>1 output values).
 
 **Real-ESRGAN — see the warning above.** Sub-second per frame at SD. Tiled path is 128/8 since 0.7.0 — 4.65× faster than the old 64/8 at 8192² output, and the seam the old geometry had is gone (see the tiling note above).
