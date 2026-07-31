@@ -268,8 +268,16 @@ public final class ForgeEngineService {
                 id = try await engine.register(NAFNetRestorePackage.registration,
                                                configuration: NAFNetConfiguration(variant: restoreVariant))
             case .upscale:
+                // ⚠️ Tile geometry is env-overridable for the V13-follow A/B (`FORGE_RE_TILE` /
+                // `FORGE_RE_OVERLAP`). V13 measured the shipped 64 as the WORST of three sizes on both
+                // backends — MLX 1440 ms at t64 vs 808 at t128, ANE 1053 vs 852 — so the default is
+                // under review; these knobs exist to measure the seam consequence before it moves.
+                let reEnv = ProcessInfo.processInfo.environment
                 id = try await engine.register(RealESRGANUpscalePackage.registration,
-                                               configuration: RealESRGANConfiguration(variant: .general))
+                                               configuration: RealESRGANConfiguration(
+                                                   variant: .general,
+                                                   inputTileSize: reEnv["FORGE_RE_TILE"].flatMap(Int.init),
+                                                   tileOverlap: reEnv["FORGE_RE_OVERLAP"].flatMap(Int.init)))
             case .upscaleQuality:
                 // int8 is the validated default and **near-lossless** — the port measures it at ~50.3 dB
                 // / cos 0.9999 against fp16, at ~4.7 GB vs ~7.5 GB. (⚠️ An earlier version of this comment
