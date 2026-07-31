@@ -96,12 +96,17 @@ extension ForgeEngineService {
     /// positions = 130.0 GiB of banks alone**, which does not fit the 137 GB dev machine, let alone
     /// 16 GB. Offloading that would move 130 GiB to disk and back every chunk; int8 tails only halve it.
     ///
-    /// 🔑 **The fix is loop order** (`GAP-PROGRAM.md` V12-B — scoped, **not built**). Banks are
-    /// per-position only because the driver iterates chunk-major, so each bank must survive a full pass.
-    /// Each tile position is an independent causal stream — that is why banks exist at all — so
-    /// tile-major iteration holds ONE live bank, 0.765 GiB, at any output size, trading O(positions)
-    /// bank memory for O(segment) frame memory. Until it lands, this gate is the honest answer and
-    /// ~9 tile positions is the 16 GB ceiling.
+    /// 🔑 **The fix is offload AND loop order** (`GAP-PROGRAM.md` V12-B — scoped, **not built**), and
+    /// the ordering of that sentence matters because an earlier revision of this comment claimed loop
+    /// order alone was enough. It is not: `banks` is an N-entry array that persists across chunks, and
+    /// under tile-major iteration each tile's bank must still persist across a *segment* boundary, so
+    /// **peak is O(positions) in both orderings**. Offload is what makes peak resident banks 1; the
+    /// interchange is what makes offload affordable, cutting traffic from 2N banks per chunk to 2N per
+    /// segment (≈7×, i.e. ~25% overhead at 4K rather than 2.7×). ⚠️ And offload only moves
+    /// `phys_footprint` at all because the engine caps the MLX buffer cache — freed buffers beyond the
+    /// cap go back to the OS instead of parking in the pool.
+    ///
+    /// Until it lands, this gate is the honest answer and ~9 tile positions is the 16 GB ceiling.
     ///
     /// - Parameter outputTilePositions: tile positions the output frame will occupy —
     ///   `ceil(outW / step) * ceil(outH / step)` for the configured tile size and overlap

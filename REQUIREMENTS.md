@@ -68,11 +68,17 @@ cares about the memory ceiling must set `wholeFrameMaxPixels` itself** (`RealESR
 | EdgeTAM | `promptSegment` | Metal GPU | 26.0 | declared |
 | SigLIP2-IQA | `imageQualityScore` | Metal GPU | 26.0 | declared |
 
-**Not registered, and therefore not available to any app today:** `videoUpscale` (⚠️ now **READY TO
-BIND** — driver shipped in `mlx-seedvr2-swift` v0.8.0, binding scoped in `probes/v12d_temporal_driver.out`;
-registration is `SeedVR2UpscalePackage.registration` routed by PackageID like the image surface, UI is
-one dial {off/conservative/default/max} → temporalWindow {1,5,9,13} — see the geometry caveat below
-before defaulting it on) and `frameInterpolate` (RIFE is ported but never registered).
+✅ **`videoUpscale` IS BOUND as of ForgeCore 0.8.x** — `ForgeEngineService.upscaleVideo(_:scale:)`
+(`Adapters/EngineVideoUpscaler.swift`). ⚠️ This line previously read *"not registered, and therefore not
+available to any app today"*, which was true when written and stale afterwards. There is **no separate
+registration**: `SeedVR2UpscalePackage` declares both `ImageUpscaleContract` and `VideoUpscaleContract`,
+so the adapter resolves the same `.upscaleQuality` PackageID the still path uses — one model load, and a
+prepared image tier leaves the video tier warm. UI is one dial {off/conservative/default/max} →
+`temporalWindow` {1,5,9,13}. 🚨 **Read the geometry ceiling below before defaulting it on**, and treat it
+as a long job: ~3.3 s per output frame at `.default`, so a 10 s 24 fps clip is roughly 13 minutes.
+
+**Still not registered, and therefore unavailable to any app:** `frameInterpolate` (RIFE is ported but
+never registered).
 
 ---
 
@@ -164,15 +170,21 @@ as the planned fix since V12-D — does NOT clear it:**
 | 720p ×2 | 84 | 64.2 GiB |
 | **HD→4K (3840×2160)** | **170** | **130.0 GiB** |
 
-At 4K, offload would move 130 GiB to disk and back **every chunk**; int8 tails only halve it. The
-planned fix was a *mechanism* answer to what is actually a *complexity-class* problem.
+Under the **current chunk-major ordering** offload would move 130 GiB to disk and back *every chunk*
+(~9 frames) — ~29 GiB/frame of I/O against ~3.3 s/frame of compute, a ~2.7× slowdown. int8 tails only
+halve it.
 
-🔑 **The fix is loop order** (`GAP-PROGRAM.md` V12-B, scoped, **not built**). Banks are per-position only
-because the driver iterates chunk-major, so every bank must survive a full pass. Each tile position is
-an independent causal stream — that is why banks exist — so tile-major iteration holds **one** live
-bank, 0.765 GiB, at any output size, trading O(positions) bank memory for O(segment) frame memory
-(~24 MB/frame at 4K). **Until that lands, the honest ceiling for the quality tier is ~9 tile positions
-(512² output) on 16 GB**, which is exactly what `videoUpscaleFits` gates on.
+🔑 **The fix is offload AND loop order** (`GAP-PROGRAM.md` V12-B, scoped, **not built**) — and to be
+precise, because an earlier revision of this section got it wrong: **loop order alone saves nothing.**
+`banks` is an N-entry array that persists across chunks, and under tile-major iteration each tile's bank
+must still persist across a *segment* boundary, so peak is O(positions) in both orderings. Offload is
+what makes peak resident banks 1; the interchange is what makes offload affordable, cutting traffic from
+2N banks per chunk to 2N per segment (~7×, i.e. ~25% overhead at 4K instead of 2.7×). ⚠️ Offload works
+at all only because the engine caps the MLX buffer cache — freed buffers beyond the cap return to the
+OS rather than parking in the pool.
+
+**Until that lands, the honest ceiling for the quality tier is ~9 tile positions (512² output) on
+16 GB**, which is exactly what `videoUpscaleFits` gates on.
 ⚠️ Still owed: the ByteDance multi-frame golden (no reference parity oracle for T>1 output values).
 
 **Real-ESRGAN — see the warning above.** Sub-second per frame at SD. Tiled path is 128/8 since 0.7.0 — 4.65× faster than the old 64/8 at 8192² output, and the seam the old geometry had is gone (see the tiling note above).
