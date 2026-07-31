@@ -99,19 +99,21 @@ extension ForgeEngineService {
     /// prediction drops to `base + min(extra banks, budget)` — which is what the
     /// `bankResidencyBudgetBytes` parameter here models, and `bankBudgetToFit` inverts.
     ///
-    /// 🔑 **Why it is affordable, and 🚨 why an earlier revision of this comment said it was not.** That
-    /// revision put the cost at 2.7× and called offload unusable; it compared bank I/O at 170 tile
-    /// positions against a compute figure measured at 9. **Compute scales with tile count too**, so the
-    /// ratio is output-size-independent: per tile position per output frame the model costs 0.363 s
-    /// (V12-D, linear within 8%) against ~0.19 s of round-trip at this machine's measured 8.74 GB/s —
-    /// **~6–13% wall clock at any output size**. Tile-major iteration would amortise the I/O ~7× further
-    /// and is now a refinement rather than the enabler it was scoped as.
+    /// 🔑 **Measured end to end** (`probes/v12b2_bank_eviction.out`, 17 frames at 40 tile positions,
+    /// arm A bracketed either side of arm B): **42.02 GiB → 12.69 GiB (3.31×)** for **+48%** wall clock
+    /// at a 1 GiB budget, with output **bit-identical** (max |Δ| = 0 over 18 frames). The model above
+    /// extrapolated to 40 positions within 4.5% un-evicted and 2% evicted, which is why this gate is
+    /// offered as a prediction rather than a guess.
     ///
-    /// ⚠️ **The real price is write volume, not latency** — roughly 800 GiB of scratch for a 10 s SD ×2
-    /// clip. Eviction is off by default and should be offered where the alternative is not running at
-    /// all, never as a blanket optimisation. ⚠️ It also only moves `phys_footprint` because the engine
-    /// caps the MLX buffer cache; freed buffers beyond the cap return to the OS rather than parking in
-    /// the pool.
+    /// 🚨 **That +48% replaces two earlier published estimates, 2.7× and ~6–13%, both wrong for the
+    /// same reason** — each divided one measurement by another taken under different conditions rather
+    /// than measuring the composite. The round trip is *serialization*-bound (57 tensors per bank
+    /// through safetensors), ~7× below raw disk bandwidth; a contiguous bank format is the headroom.
+    ///
+    /// ⚠️ **1 GiB is the extreme budget** — 39 of 40 banks spilling. Use `bankBudgetToFit` and take the
+    /// largest budget that fits; overhead falls as fewer banks spill. ⚠️ The durable price is write
+    /// volume: 59.7 GiB for 17 frames, ~840 GiB for a 10 s clip. ⚠️ And eviction only moves
+    /// `phys_footprint` because the engine caps the MLX buffer cache.
     ///
     /// - Parameter outputTilePositions: tile positions the output frame will occupy —
     ///   `ceil(outW / step) * ceil(outH / step)` for the configured tile size and overlap

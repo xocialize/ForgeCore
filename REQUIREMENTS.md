@@ -177,17 +177,33 @@ ceiling into a cost: predicted peak becomes `base + min(extra banks, budget)`, w
 `videoUpscaleFits(outputTilePositions:budgetBytes:bankResidencyBudgetBytes:)` models and
 `bankBudgetToFit` inverts — so a host can offer "run it with eviction" instead of a refusal.
 
-🔑 **Cost: ~6–13% wall clock, and INDEPENDENT of output size.** Per tile position per output frame the
-model costs 0.363 s (V12-D: 3.27 s/frame at 9 positions, 0.335 at one — linear within 8%) against
-~0.19 s of bank round-trip at this machine's measured 8.74 GB/s fsync'd write. Both terms scale with
-tile count, so the ratio does not grow with the frame.
+✅ **MEASURED end to end 2026-07-31** (`GAP-PROGRAM.md` V12-B2, `probes/v12b2_bank_eviction.out`):
+17 frames at **40 tile positions** through the shipping surface, arm A bracketed before and after B.
 
-🚨 **An earlier revision of this section put that cost at 2.7× and concluded offload could not work.**
-It compared bank I/O at 170 tile positions against a compute figure measured at 9. Compute scales with
-tile count too. That error is why this was scoped as a loop-order restructure; tile-major iteration
-would still amortise the I/O ~7× further, but it is a refinement now, not the enabler.
+| | peak `phys_footprint` | wall (17 frames) |
+|---|---|---|
+| no budget (v0.8.0) | **42.02 / 41.92 GiB** | 212.4 / 241.5 s |
+| **1 GiB bank budget** | **12.69 GiB** ✅ 3.31× | 335.6 s (**+48%**) |
 
-⚠️ **The real price is write volume, not latency** — roughly 800 GiB of scratch for a 10 s SD ×2 clip.
+✅ **Output is BIT-IDENTICAL** — max \|Δ\| = 0 across all 18 emitted frames, over two real bank
+round-trip boundaries. ✅ **And the sizing model extrapolates**: fitted at 1 and 9 tile positions, it
+predicts 43.9 GiB un-evicted (measured 42.02, within 4.5%) and 12.93 GiB evicted (measured 12.69,
+within 2%) at 40 positions. 🔑 **42 GiB does not fit a 16 GB machine and 12.7 GiB does** — that is the
+claim, now measured rather than argued.
+
+🚨 **The cost is ~48%, not the ~6–13% previously published here — and that was the third wrong
+estimate for this work.** V12-B said "2.7×, offload cannot work" (I/O at 170 tile positions against
+compute measured at 9); the replacement said "~6–13%" (bank bytes ÷ raw disk bandwidth). **A ratio of
+two quantities measured separately, under different conditions, is not a measurement.** The round trip
+runs ~7× below raw bandwidth because it is *serialization*-bound — 57 tensors per bank through
+safetensors framing — which is headroom (a contiguous bank format), not a floor.
+
+⚠️ **1 GiB is the EXTREME budget** (39 of 40 banks spill). Set the largest budget that fits, not the
+smallest that works — `bankBudgetToFit(40, 14 GiB)` returns ~2.07 GiB on a 16 GB machine, and overhead
+falls as fewer banks spill.
+
+⚠️ **The real price is write volume** — 59.7 GiB measured for 17 frames at 40 tile positions, i.e.
+~840 GiB of scratch for a 10 s 24 fps clip.
 Eviction is **off by default** and is how a machine runs a job it otherwise could not; a machine with
 headroom should leave it unset and write nothing. ⚠️ It also only moves `phys_footprint` because the
 engine caps the MLX buffer cache — freed buffers beyond the cap go back to the OS rather than parking

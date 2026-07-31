@@ -1,5 +1,5 @@
 {
-  "originHash" : "dc394e7459248d5a3e3b7ac49dcc6929c8d820052db270bfde413e62a6f078fe",
+  "originHash" : "0b56173a7a83367da5580033f915840fee0759e5c546fb5b4533ab9f25087766",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -168,8 +168,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-seedvr2-swift.git",
       "state" : {
-        "revision" : "ba48c7eb9eec4ea7161e854e04085eea64da84f0",
-        "version" : "0.9.0"
+        "revision" : "1dfc277779815366c5810c26b8b68d90473610ae",
+        "version" : "0.9.1"
       }
     },
     {
