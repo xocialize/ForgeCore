@@ -59,8 +59,11 @@ cares about the memory ceiling must set `wholeFrameMaxPixels` itself** (`RealESR
 | EdgeTAM | `promptSegment` | Metal GPU | 26.0 | declared |
 | SigLIP2-IQA | `imageQualityScore` | Metal GPU | 26.0 | declared |
 
-**Not registered, and therefore not available to any app today:** `videoUpscale` (no binding at all),
-`frameInterpolate` (RIFE is ported but never registered).
+**Not registered, and therefore not available to any app today:** `videoUpscale` (⚠️ now **READY TO
+BIND** — driver shipped in `mlx-seedvr2-swift` v0.8.0, binding scoped in `probes/v12d_temporal_driver.out`;
+registration is `SeedVR2UpscalePackage.registration` routed by PackageID like the image surface, UI is
+one dial {off/conservative/default/max} → temporalWindow {1,5,9,13} — see the geometry caveat below
+before defaulting it on) and `frameInterpolate` (RIFE is ported but never registered).
 
 ---
 
@@ -105,8 +108,28 @@ max |ΔL\*| 1.4089 → **0.3426** at T=5, and at every T the boundary max is now
 interior max — the seam is no longer where the clip's worst frame pair lives. Chunked T>1 now beats
 T=1 on max|ΔL\*| (0.700/0.586/0.494 vs 0.851).
 
-⚠️ Still open: no reference parity oracle for T>1 output *values*; measured on one clip with no cuts,
-and **carrying memory across a scene cut is exactly wrong** — nothing detects one yet.
+✅ **Scene cuts: SOLVED end-to-end (2026-07-31).** `SceneCutDetector` (media-bridge **v0.11.0**) runs
+inline in the temporal driver; a detected cut ENDS the window early and flushes state — proven through
+the shipping surface: post-cut mean |ΔL\*| **0.34** (driver) vs **2.97** (no reset), identical in the
+boundary-aligned and mid-window cases (`probes/v12d_temporal_driver.out`).
+
+✅ **The temporal chunking driver EXISTS and is the shipping surface** (`mlx-seedvr2-swift` **v0.8.0**:
+`TemporalWindowPlanner` + `SeedVR2TemporalRefiner`; `temporalWindow` on the config, default 9;
+`availableBudgetBytes` clamps T per clip geometry; requires `frame-stream-native` ≥ 0.4.0 for
+per-output PTS). T=1 through the new driver is bit-identical to v0.7.7. 🔑 **T=9 is 20–30% CHEAPER per
+frame than T=1** (3.27 vs 4.10–4.68 s bracketed) — coherence is now cheaper, not a trade.
+
+🚨 **NEW MEASURED FACT THAT CHANGES SIZING — the streaming banks are PER SPATIAL TILE POSITION
+(~0.82 GiB each, ~constant in T), so OUTPUT GEOMETRY is a memory multiplier the T-ladder above does not
+capture.** Single 256² output tile: the ladder holds (7.75/10.10/11.93 GiB at T=1/5/9). **Nine tile
+positions (512² output): 17.95–18.16 GiB** — the per-tile model predicts it within 0.3 GiB. This is the
+third instance of "a footprint is a function, not a constant": here it is a function of *output* area.
+- **≤256² output on 16 GB: T=9 quality tier works today.**
+- **Real content on 16 GB** (e.g. SD ×2 ≈ 15 tile positions ≈ ~12 GiB of banks alone): does NOT fit at
+  any T — clamping T does not shrink banks. Needs **bank offload/eviction or a per-geometry T table**
+  before the quality tier defaults on above tiny outputs; larger-memory machines run it today, which is
+  exactly the app-side capability gating the product intends.
+⚠️ Still owed: the ByteDance multi-frame golden (no reference parity oracle for T>1 output values).
 
 **Real-ESRGAN — see the warning above.** Sub-second per frame at SD.
 
