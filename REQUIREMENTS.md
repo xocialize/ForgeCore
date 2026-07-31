@@ -26,7 +26,16 @@ is accurate for tiling and **wrong for the whole-frame path**, which the package
 | SD (624×352) | whole-frame | **3.22 GB** | 0.5× |
 | **1920×1080** | whole-frame | **21.24 GB** | **3.4×** |
 | 1080×1920 | whole-frame | **24.64 GB** | **3.9×** |
-| any, tiled | tiled 64/8 | ~6 GB, flat | 1.0× ✅ |
+| any, tiled | tiled 128/8 | ~6 GB, flat | 1.0× ✅ |
+
+✅ **Tile geometry changed 64/8 → 128/8 in `mlx-realesrgan-swift` 0.7.0** (ForgeCore ≥ 0.8.3). The old
+64 was both the slowest of {64,128,256} on *both* backends and the only one with a detectable seam:
+2048²→8192² ×4 went **7.68 s → 1.65 s (4.65×)**, and the flat-block seam z-test reads **+1.50 at t64
+(a seam) vs +0.46 at t128 (none above a ~166-stride null)**. Output is otherwise near-identical
+(p99 |Δ| = 2/255). The tiled footprint row above is unchanged — it is bounded by the tile either way.
+⚠️ **`tileOverlap` is absolute, not a ratio** — it covers the receptive field, which does not grow with
+the tile, so 8 px at 128 is exactly the margin 8 px at 64 was, across 4.2× fewer seams. Do not "fix"
+the ratio.
 
 *(`GAP-PROGRAM.md` V12, in-app `phys_footprint`, the admission basis — not MLX peak, which under-reads
 by ~2.5–2.9×.)*
@@ -131,7 +140,7 @@ third instance of "a footprint is a function, not a constant": here it is a func
   exactly the app-side capability gating the product intends.
 ⚠️ Still owed: the ByteDance multi-frame golden (no reference parity oracle for T>1 output values).
 
-**Real-ESRGAN — see the warning above.** Sub-second per frame at SD.
+**Real-ESRGAN — see the warning above.** Sub-second per frame at SD. Tiled path is 128/8 since 0.7.0 — 4.65× faster than the old 64/8 at 8192² output, and the seam the old geometry had is gone (see the tiling note above).
 
 ---
 

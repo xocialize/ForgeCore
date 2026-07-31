@@ -1,5 +1,5 @@
 {
-  "originHash" : "6de2605311c23ce34a9734ade76fa86ce0c3536554049ad2048df8348f4b82b1",
+  "originHash" : "17aa6354e35d8090bda0a2fd97ea9607d3a060b14d7b0331e1f5f33b74a89a04",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -150,8 +150,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-realesrgan-swift.git",
       "state" : {
-        "revision" : "266b38c030ef5b07b2fc9c5d275e9005f6bd81a7",
-        "version" : "0.6.5"
+        "revision" : "f28e58a5393513f526e8f8dca66fcd2db8fdb13d",
+        "version" : "0.7.0"
       }
     },
     {

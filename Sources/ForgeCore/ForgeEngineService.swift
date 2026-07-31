@@ -268,10 +268,13 @@ public final class ForgeEngineService {
                 id = try await engine.register(NAFNetRestorePackage.registration,
                                                configuration: NAFNetConfiguration(variant: restoreVariant))
             case .upscale:
-                // ⚠️ Tile geometry is env-overridable for the V13-follow A/B (`FORGE_RE_TILE` /
-                // `FORGE_RE_OVERLAP`). V13 measured the shipped 64 as the WORST of three sizes on both
-                // backends — MLX 1440 ms at t64 vs 808 at t128, ANE 1053 vs 852 — so the default is
-                // under review; these knobs exist to measure the seam consequence before it moves.
+                // ✅ **The A/B these knobs existed for is DONE and the package default moved to 128/8**
+                // (`mlx-realesrgan-swift` 0.7.0). t128 is 4.65× faster end to end at 8192² output and is
+                // the arm WITHOUT a detectable seam — t64 seams at z +1.50 against a null sweep, t128 at
+                // +0.46. `FORGE_RE_TILE` / `FORGE_RE_OVERLAP` stay for future geometry work; leaving both
+                // unset now takes the fast, clean path rather than the old 64.
+                // ⚠️ `tileOverlap` is ABSOLUTE (it covers the receptive field). Do NOT raise it to keep
+                // the old 1:8 ratio — that costs throughput and buys no margin.
                 let reEnv = ProcessInfo.processInfo.environment
                 id = try await engine.register(RealESRGANUpscalePackage.registration,
                                                configuration: RealESRGANConfiguration(
