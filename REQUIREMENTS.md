@@ -80,6 +80,15 @@ as a long job: ~3.3 s per output frame at `.default`, so a 10 s 24 fps clip is r
 **Still not registered, and therefore unavailable to any app:** `frameInterpolate` (RIFE is ported but
 never registered).
 
+✅ **A second `imageUpscale` backend exists for macOS 27+ hosts: CoreAI/ANE Real-ESRGAN**
+(`coreai-realesrgan-swift` ≥ 0.2.0, product `CoreAIRealESRGAN` — MLXToolKit-only, zero MLX). ForgeCore
+floors at 26 and cannot link it; a 27-floored app injects it via `ExternalRegistration` (ForgeCore
+≥ 0.12.0) and it registers beside the MLX backer under its own PackageID. Measured through the package
+surface at 1080p→×4: **resident 19 MB, peak 0.86 GB, 1.60 s** — ~25× lighter than the MLX whole-frame
+path, ~7× lighter than tiled, at **≈4.5–4.9× less energy** (V13). fp16 parity per variant: min 58.15 dB
+(wdn) to 68.56 dB (general). macOS 27 releases publicly ~October; below 27 the MLX backer is the path,
+by design.
+
 ---
 
 ## Measured operating points — the numbers an integrator actually needs

@@ -182,6 +182,41 @@ public struct RegistrationOutcome: Sendable {
     public var isRegistered: Bool { packageID != nil }
 }
 
+/// An app-injected registration ForgeCore runs beside its own — the seam that lets a HIGHER-floored
+/// backend plug into a macOS-26 ForgeCore without raising anyone's floor.
+///
+/// 🔑 **The concrete case this exists for: `CoreAIRealESRGAN`** (macOS 27+, ANE). SPM refuses a
+/// 26-floored package depending on a 27-floored one, so ForgeCore cannot link it — but an app whose
+/// own deployment target is 27+ can, and injects it here. Below 27 the app simply doesn't, and the
+/// MLX backer keeps serving the capability: the OS split is the design.
+///
+/// The closure performs the actual `engine.register(...)` call because configuration types are
+/// per-package; ForgeCore stays generic. Outcomes surface in `externalOutcomes` with the same
+/// honesty rules as built-ins: a failure is a fact to show, not an error to retry.
+public struct ExternalRegistration: Sendable {
+    public let name: String
+    public let capability: Capability
+    public let register: @Sendable (MLXServeEngine) async throws -> PackageID
+
+    public init(name: String, capability: Capability,
+                register: @escaping @Sendable (MLXServeEngine) async throws -> PackageID) {
+        self.name = name
+        self.capability = capability
+        self.register = register
+    }
+}
+
+/// Outcome of one external registration — parallel to `RegistrationOutcome`, keyed by name because
+/// externals are not `ForgeModel` cases (that enum is ForgeCore's own registry of record).
+public struct ExternalRegistrationOutcome: Sendable {
+    public let name: String
+    public let capability: Capability
+    public let packageID: PackageID?
+    public let failure: String?
+
+    public var isRegistered: Bool { packageID != nil }
+}
+
 @MainActor
 @Observable
 public final class ForgeEngineService {
@@ -251,6 +286,13 @@ public final class ForgeEngineService {
     /// `videoUpscaleFits(outputTilePositions:budgetBytes:bankResidencyBudgetBytes:)` to decide.
     public let bankResidencyBudgetBytes: Int?
 
+    /// App-injected registrations, run by `registerAll()` after the built-ins. See
+    /// `ExternalRegistration` for why this exists (the CoreAI/ANE backend is the first user).
+    public let externalRegistrations: [ExternalRegistration]
+
+    /// Outcome per external registration, in injection order, once `registerAll()` has run.
+    public private(set) var externalOutcomes: [ExternalRegistrationOutcome] = []
+
     /// - Parameters:
     ///   - policy: license gate. Leave at `.permissiveOnly` for a shipping product; a research build
     ///     may widen it.
@@ -261,12 +303,14 @@ public final class ForgeEngineService {
                 enforcement: LicenseEnforcement = .blocking,
                 restoreVariant: NAFNetVariant = .signage,
                 videoTemporalTier: VideoTemporalTier = .default,
-                bankResidencyBudgetBytes: Int? = nil) {
+                bankResidencyBudgetBytes: Int? = nil,
+                externalRegistrations: [ExternalRegistration] = []) {
         self.engine = MLXServeEngine(policy: policy, licenseEnforcement: enforcement)
         self.restoreVariant = restoreVariant
         self.videoTemporalTier = videoTemporalTier
         self.bankResidencyBudgetBytes = bankResidencyBudgetBytes
             ?? ProcessInfo.processInfo.environment["FORGE_SEEDVR2_BANK_BUDGET"].flatMap(Int.init)
+        self.externalRegistrations = externalRegistrations
     }
 
     // MARK: - Model store
@@ -304,6 +348,22 @@ public final class ForgeEngineService {
             results.append(await register(model))
         }
         outcomes = results
+
+        var external: [ExternalRegistrationOutcome] = []
+        for reg in externalRegistrations {
+            do {
+                let id = try await reg.register(engine)
+                external.append(ExternalRegistrationOutcome(
+                    name: reg.name, capability: reg.capability, packageID: id, failure: nil))
+                log.notice("External registration \(reg.name, privacy: .public) registered")
+            } catch {
+                external.append(ExternalRegistrationOutcome(
+                    name: reg.name, capability: reg.capability, packageID: nil,
+                    failure: String(describing: error)))
+                log.error("External registration \(reg.name, privacy: .public) failed: \(String(describing: error), privacy: .public)")
+            }
+        }
+        externalOutcomes = external
 
         let failed = results.filter { !$0.isRegistered }
         if failed.isEmpty {
@@ -468,6 +528,11 @@ public final class ForgeEngineService {
     /// call; nil means the capability is unavailable and should be presented as such rather than failing
     /// at the moment the user clicks.
     public func packageID(for model: ForgeModel) -> PackageID? { packageIDs[model] }
+
+    /// PackageID of an app-injected registration, by its injection name.
+    public func packageID(forExternal name: String) -> PackageID? {
+        externalOutcomes.first(where: { $0.name == name })?.packageID
+    }
 
     public func outcome(for model: ForgeModel) -> RegistrationOutcome? {
         outcomes.first { $0.model == model }
