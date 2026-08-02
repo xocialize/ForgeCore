@@ -67,6 +67,13 @@ cares about the memory ceiling must set `wholeFrameMaxPixels` itself** (`RealESR
 | SEA-RAFT | `opticalFlow` | Metal GPU | 26.0 | declared |
 | EdgeTAM | `promptSegment` | Metal GPU | 26.0 | declared |
 | SigLIP2-IQA | `imageQualityScore` | Metal GPU | 26.0 | declared |
+| BOPBTL | `defectDetect` | CPU (pinned — see note) | 26.0 | **measured**: 1.63 GB active / 3.9 GB at the 2 GiB cache, ~1 s/image |
+
+⚠️ **BOPBTL runs on the CPU stream by its core's own pin**: the Metal fp32 conv2d kernel is wrong in
+its geometry window (inC ≥ 128 ∧ outC ≥ 128 ∧ spatial ≥ ~64 — receipted in `mlx-bopbtl-swift`, with
+a `--gpu-probe` to re-test on every mlx-swift bump). Detection runs at short-side 256, so CPU costs
+~1 s/image. Its mask composes with the registered `imageInpaint` (detect → mask → fill). Corpus
+validation on real scratched photographs is deferred to the restore-app scaffolding stage (P7).
 
 ✅ **`videoUpscale` IS BOUND as of ForgeCore 0.8.x** — `ForgeEngineService.upscaleVideo(_:scale:)`
 (`Adapters/EngineVideoUpscaler.swift`). ⚠️ This line previously read *"not registered, and therefore not

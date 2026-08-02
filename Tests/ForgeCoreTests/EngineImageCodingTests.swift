@@ -97,7 +97,7 @@ struct EngineImageCodingTests {
         // which failed the moment BRIDGE-066/067 registered the frame-restore wave). The doc
         // comment above already named the lesson; this line finally applies it. A floor still
         // catches accidental case deletion without re-failing on every legitimate addition.
-        #expect(models.count >= 18)
+        #expect(models.count >= 19)
         #expect(Set(models.map(\.modelName)).count == models.count)
         #expect(Set(models.map(\.rawValue)).count == models.count)
         // Capability sharing is intentional and load-bearing: assert the tier pair specifically, so a
@@ -108,6 +108,7 @@ struct EngineImageCodingTests {
         let restoreBackers = models.filter { $0.capability == .imageRestore }
         #expect(restoreBackers.count == 9)
         #expect(ForgeModel.relight.capability == .imageRelight)
+        #expect(ForgeModel.defectDetect.capability == .defectDetect)
         // Restormer is ONE package, THREE registrations — distinct cases, distinct display names.
         let restormers: [ForgeModel] = [.restormerMotion, .restormerDefocus, .restormerDenoise]
         #expect(Set(restormers.map(\.modelName)).count == 3)

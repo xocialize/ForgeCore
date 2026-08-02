@@ -35,7 +35,7 @@ let package = Package(
 
         // The engine. v0.37.0 is the FIRST tag carrying `licenseEnforcement` (contract 1.28.0) —
         // do not lower this floor, or `.blocking` silently stops being expressible.
-        .package(url: "https://github.com/xocialize/mlx-engine-swift.git", from: "0.37.0"),
+        .package(url: "https://github.com/xocialize/mlx-engine-swift.git", from: "0.43.0"),
 
         // Model wrappers — the heavy pins.
         .package(url: "https://github.com/xocialize/mlx-nafnet-swift.git", from: "0.4.0"),
@@ -48,6 +48,7 @@ let package = Package(
         .package(url: "https://github.com/xocialize/mlx-cidnet-swift.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/mlx-gfpgan-swift.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/mlx-restoreformer-swift.git", from: "0.1.0"),
+        .package(url: "https://github.com/xocialize/mlx-bopbtl-swift.git", from: "0.2.0"),
         // Category A Kit — RestoreTier2 is the provider-protocol seam this package implements
         // (BRIDGE-070). One-way: the Kit never depends back on ForgeCore.
         .package(url: "https://github.com/xocialize/ForgeRestoreKit.git", from: "0.10.0"),
@@ -88,6 +89,7 @@ let package = Package(
                 .product(name: "MLXCIDNet", package: "mlx-cidnet-swift"),
                 .product(name: "MLXGFPGAN", package: "mlx-gfpgan-swift"),
                 .product(name: "MLXRestoreFormer", package: "mlx-restoreformer-swift"),
+                .product(name: "MLXBOPBTL", package: "mlx-bopbtl-swift"),
                 .product(name: "RestoreTier2", package: "ForgeRestoreKit"),
                 .product(name: "MLXRealESRGAN", package: "mlx-realesrgan-swift"),
                 .product(name: "MLXSeedVR2", package: "mlx-seedvr2-swift"),

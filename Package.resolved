@@ -1,5 +1,5 @@
 {
-  "originHash" : "8c8ceeef5e71a6a5cdf9c0659772b54483f054bd5921518a0c6c1e8acdd896e7",
+  "originHash" : "d5401f23a0c80970171707862d7b234f8e2f7bd01ae19e7a841952f03e286246",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -110,6 +110,15 @@
       }
     },
     {
+      "identity" : "mlx-bopbtl-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/xocialize/mlx-bopbtl-swift.git",
+      "state" : {
+        "revision" : "e5d45c0fe5946ff99ff6503713331a2558da1f0c",
+        "version" : "0.2.0"
+      }
+    },
+    {
       "identity" : "mlx-cidnet-swift",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-cidnet-swift.git",
@@ -150,8 +159,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-engine-swift.git",
       "state" : {
-        "revision" : "6bed83fab8f6849cebdd991a7a16456c3a764ce9",
-        "version" : "0.40.1"
+        "revision" : "0c1a08488352ae68bce6428038c59edc4f254268",
+        "version" : "0.43.0"
       }
     },
     {

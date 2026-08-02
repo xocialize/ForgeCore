@@ -26,6 +26,7 @@ import MLXSCUNet
 import MLXCIDNet
 import MLXGFPGAN
 import MLXRestoreFormer
+import MLXBOPBTL
 import MLXRealESRGAN
 import MLXSeedVR2
 import MLXBiRefNet
@@ -85,6 +86,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
     case relight           // HVI-CIDNet — first `imageRelight` backer; luma gate is IN-PACKAGE, ForgeCore must not second-guess it
     case faceRestore       // GFPGAN v1.4
     case faceRestoreVQ     // RestoreFormer++ — the VQ-dictionary sibling
+    case defectDetect      // BOPBTL scratch detector — first `defectDetect` backer (contract 1.31.0); composes with `inpaint`
 
     public var modelName: String {
         switch self {
@@ -106,6 +108,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .relight:          return "HVI-CIDNet"
         case .faceRestore:      return "GFPGAN"
         case .faceRestoreVQ:    return "RestoreFormer++"
+        case .defectDetect:     return "BOPBTL"
         }
     }
 
@@ -131,6 +134,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
              .denoiseStrength, .denoiseBlind, .faceRestore, .faceRestoreVQ:
             return .imageRestore
         case .relight: return .imageRelight
+        case .defectDetect: return .defectDetect
         }
     }
 }
@@ -476,6 +480,13 @@ public final class ForgeEngineService {
             case .faceRestoreVQ:
                 id = try await engine.register(RestoreFormerRestorePackage.registration,
                                                configuration: RestoreFormerConfiguration())
+            case .defectDetect:
+                // The detection half of automatic damage repair — its mask feeds the registered
+                // `.inpaint`. ⚠️ Corpus validation on real scratched photographs is deliberately
+                // deferred to the app/restore-scaffolding stage (P7 row); upstream synthetic
+                // behaviour: 100% recall / 65.7% precision / zero false pixels on a clean control.
+                id = try await engine.register(BOPBTLDetectPackage.registration,
+                                               configuration: BOPBTLConfiguration())
             case .colorize:
                 id = try await engine.register(DDColorPackage.registration,
                                                configuration: DDColorConfiguration())
