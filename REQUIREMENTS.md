@@ -193,26 +193,32 @@ ceiling into a cost: predicted peak becomes `base + min(extra banks, budget)`, w
 `videoUpscaleFits(outputTilePositions:budgetBytes:bankResidencyBudgetBytes:)` models and
 `bankBudgetToFit` inverts — so a host can offer "run it with eviction" instead of a refusal.
 
-✅ **MEASURED end to end 2026-07-31** (`GAP-PROGRAM.md` V12-B2, `probes/v12b2_bank_eviction.out`):
-17 frames at **40 tile positions** through the shipping surface, arm A bracketed before and after B.
+✅ **MEASURED end to end 2026-07-31** (`GAP-PROGRAM.md` V12-B2, `probes/v12b2_bank_eviction.out`),
+**cost REMEASURED 2026-08-03 with repeated arms** (`probes/v12b3g_bank_granule_io.out` — arms in both
+orders, 150 s cooldowns, baselines woven through): 17 frames at **40 tile positions** through the
+shipping surface.
 
-| | peak `phys_footprint` | wall (17 frames) |
+| | peak `phys_footprint` | wall (17 frames, 2026-08-03 arms) |
 |---|---|---|
-| no budget (v0.8.0) | **42.02 / 41.92 GiB** | 212.4 / 241.5 s |
-| **1 GiB bank budget** | **12.69 GiB** ✅ 3.31× | 335.6 s (**+48%**) |
+| no budget (v0.8.0) | **42.02 / 41.83–42.04 GiB** | 225.0 / 244.0 s |
+| **1 GiB bank budget** | **12.69 / 12.68–12.74 GiB** ✅ 3.31× | 241.2–266.8 s (**≈+7%**, spread 0–19%) |
+| `bankBudgetToFit` 2.07 GiB | **13.50 GiB** (13.57 predicted) | 258.4 s |
 
 ✅ **Output is BIT-IDENTICAL** — max \|Δ\| = 0 across all 18 emitted frames, over two real bank
-round-trip boundaries. ✅ **And the sizing model extrapolates**: fitted at 1 and 9 tile positions, it
-predicts 43.9 GiB un-evicted (measured 42.02, within 4.5%) and 12.93 GiB evicted (measured 12.69,
-within 2%) at 40 positions. 🔑 **42 GiB does not fit a 16 GB machine and 12.7 GiB does** — that is the
+round-trip boundaries (re-confirmed across 7 arms in the remeasure). ✅ **And the sizing model
+extrapolates**: fitted at 1 and 9 tile positions, it predicts 43.9 GiB un-evicted (measured 42.02,
+within 4.5%) and 12.93 GiB evicted (measured 12.69, within 2%) at 40 positions; the remeasure landed
+within 0.6% at BOTH budgets. 🔑 **42 GiB does not fit a 16 GB machine and 12.7 GiB does** — that is the
 claim, now measured rather than argued.
 
-🚨 **The cost is ~48%, not the ~6–13% previously published here — and that was the third wrong
-estimate for this work.** V12-B said "2.7×, offload cannot work" (I/O at 170 tile positions against
-compute measured at 9); the replacement said "~6–13%" (bank bytes ÷ raw disk bandwidth). **A ratio of
-two quantities measured separately, under different conditions, is not a measurement.** The round trip
-runs ~7× below raw bandwidth because it is *serialization*-bound — 57 tensors per bank through
-safetensors framing — which is headroom (a contiguous bank format), not a floor.
+🚨 **Cost-figure history, kept honest: 2.7× → ~6–13% → +48% → ≈+7% (current).** The first two divided
+quantities measured under different conditions. The +48% (2026-07-31) measured the composite but ran
+the treatment arm ONCE, and it absorbed session drift — the remeasure's four evicted arms all run
+20–28% below it with matching baselines. Its "serialization-bound, ~7× below raw" decomposition was
+then falsified directly: a contiguous single-buffer bank format (BlockStreamKit `GranuleSpillFile`)
+A/B'd through the same path is composite-invisible — the round trip runs at disk rate on both
+transports. **Measure the composite, AND repeat the arms.** ⚠️ Cost band measured on a 128 GB host;
+the 16 GB-arm composite (where buffered spill cannot ride the page cache) is the open receipt.
 
 ⚠️ **1 GiB is the EXTREME budget** (39 of 40 banks spill). Set the largest budget that fits, not the
 smallest that works — `bankBudgetToFit(40, 14 GiB)` returns ~2.07 GiB on a 16 GB machine, and overhead

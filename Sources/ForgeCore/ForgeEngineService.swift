@@ -154,10 +154,11 @@ public enum ForgeModel: String, CaseIterable, Sendable {
 ///
 /// ✅ **Bank offload/eviction SHIPPED 2026-07-31** (`mlx-seedvr2-swift` v0.9.0) and is what extends this
 /// downmarket: set `ForgeEngineService.bankResidencyBudgetBytes` and banks over the budget round-trip
-/// through scratch **bit-identically** — measured 42.02 GiB → 12.69 GiB (3.31×) for **+48%** wall clock
-/// at 40 tile positions, `probes/v12b2_bank_eviction.out`. ⚠️ Off by default, because the real price is
-/// write volume (~840 GiB of scratch for a 10 s clip) — it is how a machine runs a job it otherwise
-/// could not, not a blanket optimisation.
+/// through scratch **bit-identically** — measured 42.02 GiB → 12.69 GiB (3.31×) at 40 tile positions
+/// for **≈+7% wall clock (0–19% across repeated arms; remeasured 2026-08-03,
+/// `probes/v12b3g_bank_granule_io.out` — the originally published +48% was session drift in a single
+/// unrepeated arm)**. ⚠️ Off by default, because the real price is write volume (~840 GiB of scratch
+/// for a 10 s clip) — it is how a machine runs a job it otherwise could not, not a blanket optimisation.
 ///
 /// ⚠️ The tier is a **ceiling, not a guarantee**: the driver clamps the effective window down its
 /// measured ladder using the engine-stamped `availableBudgetBytes` and the clip's geometry.
@@ -280,9 +281,10 @@ public final class ForgeEngineService {
     /// 🔑 **This is the knob that lets the quality tier exceed ~9 tile positions.** Bank residency is
     /// `tilePositions × ~0.765 GiB` (`GAP-PROGRAM.md` V12-B) — 6.9 GiB at a 512² output but 26.8 GiB at
     /// SD ×2, more than a 16 GB machine has. Set a budget and the excess round-trips through a scratch
-    /// directory **bit-identically** — measured 42.02 GiB → 12.69 GiB for +48% wall clock at a 1 GiB
-    /// budget (`probes/v12b2_bank_eviction.out`). ⚠️ That budget is the extreme; use `bankBudgetToFit`
-    /// and take the largest that fits, since overhead falls as fewer banks spill.
+    /// directory **bit-identically** — measured 42.02 GiB → 12.69 GiB at a 1 GiB budget for ≈+7% wall
+    /// clock (0–19% across repeated arms; `probes/v12b3g_bank_granule_io.out`, superseding the
+    /// drift-contaminated +48% of `v12b2_bank_eviction.out`). ⚠️ That budget is the extreme; use
+    /// `bankBudgetToFit` and take the largest that fits.
     ///
     /// ⚠️ **Do not set this as a blanket optimisation.** The real price is write volume — 59.7 GiB
     /// measured for 17 frames at 40 tile positions, ~840 GiB for a 10 s clip. It is how a machine runs a job it otherwise could not;

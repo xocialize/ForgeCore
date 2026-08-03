@@ -99,21 +99,25 @@ extension ForgeEngineService {
     /// prediction drops to `base + min(extra banks, budget)` — which is what the
     /// `bankResidencyBudgetBytes` parameter here models, and `bankBudgetToFit` inverts.
     ///
-    /// 🔑 **Measured end to end** (`probes/v12b2_bank_eviction.out`, 17 frames at 40 tile positions,
-    /// arm A bracketed either side of arm B): **42.02 GiB → 12.69 GiB (3.31×)** for **+48%** wall clock
-    /// at a 1 GiB budget, with output **bit-identical** (max |Δ| = 0 over 18 frames). The model above
-    /// extrapolated to 40 positions within 4.5% un-evicted and 2% evicted, which is why this gate is
-    /// offered as a prediction rather than a guess.
+    /// 🔑 **Measured end to end, twice** (`probes/v12b2_bank_eviction.out` 2026-07-31;
+    /// `probes/v12b3g_bank_granule_io.out` 2026-08-03 with repeated arms in both orders + cooldowns):
+    /// **42.02 GiB → 12.69 GiB (3.31×)** at a 1 GiB budget, output **bit-identical** (max |Δ| = 0 over
+    /// 18 frames), for **≈+7% wall clock (0–19% across arms)**. The memory model held in both sessions —
+    /// the remeasure landed within 0.6% at 1 GiB AND at the `bankBudgetToFit` budget (13.50 vs 13.57
+    /// predicted GiB) — which is why this gate is offered as a prediction rather than a guess.
     ///
-    /// 🚨 **That +48% replaces two earlier published estimates, 2.7× and ~6–13%, both wrong for the
-    /// same reason** — each divided one measurement by another taken under different conditions rather
-    /// than measuring the composite. The round trip is *serialization*-bound (57 tensors per bank
-    /// through safetensors), ~7× below raw disk bandwidth; a contiguous bank format is the headroom.
+    /// 🚨 **Cost-figure history, kept honest:** 2.7× → ~6–13% → +48% → ≈+7%. The first two divided
+    /// measurements taken under different conditions; the +48% measured the composite but ran the
+    /// treatment arm ONCE, and it absorbed session drift (the remeasure's four evicted arms all run
+    /// 20–28% below it, with baselines matching). A subsequent A/B also falsified the
+    /// "serialization-bound" decomposition — the bank round trip runs at disk rate on both the
+    /// safetensors and contiguous-granule transports. *Measure the composite, and repeat the arms.*
     ///
     /// ⚠️ **1 GiB is the extreme budget** — 39 of 40 banks spilling. Use `bankBudgetToFit` and take the
-    /// largest budget that fits; overhead falls as fewer banks spill. ⚠️ The durable price is write
-    /// volume: 59.7 GiB for 17 frames, ~840 GiB for a 10 s clip. ⚠️ And eviction only moves
-    /// `phys_footprint` because the engine caps the MLX buffer cache.
+    /// largest budget that fits. ⚠️ The durable price is write volume: 59.7 GiB for 17 frames
+    /// (machine-reported by `lastVideoBankStatistics`), ~840 GiB for a 10 s clip. ⚠️ Eviction only moves
+    /// `phys_footprint` because the engine caps the MLX buffer cache. ⚠️ Cost band measured on a 128 GB
+    /// host; the 16 GB-arm composite is the open receipt.
     ///
     /// - Parameter outputTilePositions: tile positions the output frame will occupy —
     ///   `ceil(outW / step) * ceil(outH / step)` for the configured tile size and overlap
@@ -155,8 +159,9 @@ extension ForgeEngineService {
     /// `budgetBytes`), which is an honest "no" rather than a budget that would still OOM.
     ///
     /// ⚠️ **A returned budget is not free.** Every byte of bank over it round-trips through scratch once
-    /// per chunk — ~6–13% wall clock, and write volume in the hundreds of GiB for a real clip. Offer it
-    /// where the alternative is not running at all.
+    /// per chunk — ≈+7% wall clock (0–19% across repeated arms, `probes/v12b3g_bank_granule_io.out`),
+    /// and write volume in the hundreds of GiB for a real clip. Offer it where the alternative is not
+    /// running at all.
     nonisolated public static func bankBudgetToFit(outputTilePositions: Int,
                                        budgetBytes: UInt64) -> Int? {
         let singleTileBytes: Double = 11.93 * 1024 * 1024 * 1024
