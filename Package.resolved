@@ -1,5 +1,5 @@
 {
-  "originHash" : "d5401f23a0c80970171707862d7b234f8e2f7bd01ae19e7a841952f03e286246",
+  "originHash" : "0be5cb5890441e47c420d682f09b4922b45e71174a6fded905bf2d39e9a260c8",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -42,8 +42,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/ForgeOptimizerKit.git",
       "state" : {
-        "revision" : "ab7c56f7217d00d21e70d8bfda6040cb5f614d13",
-        "version" : "0.4.0"
+        "revision" : "9c917f49fc284dd96d3ae6f15392a5fcf0cbdf3c",
+        "version" : "0.5.0"
       }
     },
     {
@@ -60,8 +60,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/ForgeRestoreKit.git",
       "state" : {
-        "revision" : "e61822b46998693127878a93073b54ef3083878a",
-        "version" : "0.10.0"
+        "revision" : "902cf7be530993e0e83bf962f36baca4312c9140",
+        "version" : "0.11.0"
       }
     },
     {
@@ -96,8 +96,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/media-bridge.git",
       "state" : {
-        "revision" : "de92a8a7a5c2c695d5139c6a511aeaeabdd988d0",
-        "version" : "0.11.0"
+        "revision" : "43cedc3dabfc2afa0a6ac9c5ff5d6ca0f3425d11",
+        "version" : "0.13.0"
       }
     },
     {
@@ -159,8 +159,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-engine-swift.git",
       "state" : {
-        "revision" : "0c1a08488352ae68bce6428038c59edc4f254268",
-        "version" : "0.43.0"
+        "revision" : "fa23408a4eaea6dc20db6ff4459e73003e666d1a",
+        "version" : "0.44.0"
       }
     },
     {
@@ -258,8 +258,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-seedvr2-swift.git",
       "state" : {
-        "revision" : "1dfc277779815366c5810c26b8b68d90473610ae",
-        "version" : "0.9.1"
+        "revision" : "25cf126589a633de5755cba3a22b30b250740887",
+        "version" : "0.9.2"
       }
     },
     {
@@ -366,8 +366,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-system.git",
       "state" : {
-        "revision" : "50688cacbd41d547e9eb9f7a213542340b7c442b",
-        "version" : "1.7.5"
+        "revision" : "704705c5c51156ede21172a38654d522ce487074",
+        "version" : "1.8.0"
       }
     },
     {
