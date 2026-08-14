@@ -35,6 +35,7 @@ import MLXDDColor
 import MLXInpaint
 import MLXSEARAFT
 import MLXEdgeTAM
+import MLXRIFE
 
 let log = Logger(subsystem: "com.xocialize.ForgeCore", category: "ForgeCore")
 
@@ -88,6 +89,14 @@ public enum ForgeModel: String, CaseIterable, Sendable {
     case faceRestoreVQ     // RestoreFormer++ — the VQ-dictionary sibling
     case defectDetect      // BOPBTL scratch detector — first `defectDetect` backer (contract 1.31.0); composes with `inpaint`
 
+    // ── frameInterpolate (AB-T-0038) ──
+    // Registered 2026-08-14. RIFE 4.25 was ported and parity-locked 2026-06-18 (cosine 1.0 vs the
+    // Python reference) and shipped at v0.8.0 with tiling + the CAN gate — but no registration
+    // existed anywhere, so no app could reach it: the same shipped-but-invisible gap the
+    // frame-restore wave closed for the image fleet. App-facing seam: `interpolateVideo(_:factor:)`
+    // (`Adapters/EngineFrameInterpolator.swift`).
+    case frameInterpolate  // RIFE 4.25
+
     public var modelName: String {
         switch self {
         case .restore:    return "NAFNet"
@@ -109,6 +118,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .faceRestore:      return "GFPGAN"
         case .faceRestoreVQ:    return "RestoreFormer++"
         case .defectDetect:     return "BOPBTL"
+        case .frameInterpolate: return "RIFE"
         }
     }
 
@@ -135,6 +145,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
             return .imageRestore
         case .relight: return .imageRelight
         case .defectDetect: return .defectDetect
+        case .frameInterpolate: return .frameInterpolate
         }
     }
 }
@@ -501,6 +512,16 @@ public final class ForgeEngineService {
             case .promptMask:
                 id = try await engine.register(EdgeTAMPackage.registration,
                                                configuration: EdgeTAMConfiguration())
+            case .frameInterpolate:
+                // Package defaults on purpose (the BRIDGE-067 discipline): factor 2, and the tiling
+                // geometry (whole-frame ≤ 1080p, tile 1024 / overlap 128 above) is the package's own
+                // measured 4K-admissible configuration, not ForgeCore's to second-guess.
+                // ⚠️ The output re-encode is frame-stream-native's SOFTWARE-HEVC default, and that
+                // default is load-bearing: hardware VideoToolbox HEVC right after heavy Metal compute
+                // stalls — and on quarantined builds (AB-B-0002, 26A5406e) panics the machine on
+                // teardown. No Forge surface may set FRAMESTREAM_ENCODE=hardware.
+                id = try await engine.register(RIFEInterpolatePackage.registration,
+                                               configuration: RIFEConfiguration())
             case .qualityScore:
                 // `maxPatches` is a coverage/cost knob, not a quality knob: the scorer mean-pools up to
                 // N native-scale 224² patches. ⚠️ **The default 8 is too few for a 2048² frame** — 8

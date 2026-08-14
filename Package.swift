@@ -71,6 +71,10 @@ let package = Package(
         .package(url: "https://github.com/xocialize/mlx-lama-swift.git", from: "0.2.0"),
         .package(url: "https://github.com/xocialize/mlx-sea-raft-swift.git", from: "0.5.0"),
         .package(url: "https://github.com/xocialize/mlx-edgetam-swift.git", from: "0.4.1"),
+        // frameInterpolate — RIFE 4.25 (AB-T-0038). Ported and parity-locked 2026-06-18, but no
+        // registration existed anywhere, so the capability was unreachable by every app until
+        // 2026-08-14. 0.8.0 = the CAN-gate retrofit tag.
+        .package(url: "https://github.com/xocialize/mlx-rife-swift.git", from: "0.8.0"),
     ],
     targets: [
         .target(
@@ -102,6 +106,7 @@ let package = Package(
                 .product(name: "MLXInpaint", package: "mlx-lama-swift"),
                 .product(name: "MLXSEARAFT", package: "mlx-sea-raft-swift"),
                 .product(name: "MLXEdgeTAM", package: "mlx-edgetam-swift"),
+                .product(name: "MLXRIFE", package: "mlx-rife-swift"),
             ]
         ),
         // ⚠️ Run with `swift test --build-system swiftbuild`. Importing MLX inherits the metallib

@@ -68,6 +68,7 @@ cares about the memory ceiling must set `wholeFrameMaxPixels` itself** (`RealESR
 | EdgeTAM | `promptSegment` | Metal GPU | 26.0 | declared |
 | SigLIP2-IQA | `imageQualityScore` | Metal GPU | 26.0 | declared |
 | BOPBTL | `defectDetect` | CPU (pinned — see note) | 26.0 | **measured**: 1.63 GB active / 3.9 GB at the 2 GiB cache, ~1 s/image |
+| RIFE 4.25 | `frameInterpolate` | Metal GPU | 26.0 | declared: fp32 resident 150 MB + peak 4.0 GB — **measured 3.58 GB** phys at 1080p whole-frame |
 
 ⚠️ **BOPBTL runs on the CPU stream by its core's own pin**: the Metal fp32 conv2d kernel is wrong in
 its geometry window (inC ≥ 128 ∧ outC ≥ 128 ∧ spatial ≥ ~64 — receipted in `mlx-bopbtl-swift`, with
@@ -84,8 +85,20 @@ prepared image tier leaves the video tier warm. UI is one dial {off/conservative
 `temporalWindow` {1,5,9,13}. 🚨 **Read the geometry ceiling below before defaulting it on**, and treat it
 as a long job: ~3.3 s per output frame at `.default`, so a 10 s 24 fps clip is roughly 13 minutes.
 
-**Still not registered, and therefore unavailable to any app:** `frameInterpolate` (RIFE is ported but
-never registered).
+✅ **`frameInterpolate` IS REGISTERED AND BOUND as of ForgeCore 0.15.0 (2026-08-14, AB-T-0038)** —
+`ForgeEngineService.interpolateVideo(_:factor:)` (`Adapters/EngineFrameInterpolator.swift`), the 20th
+registration. ⚠️ This line previously read *"Still not registered, and therefore unavailable to any
+app"* — true from the port's landing (2026-06-18) until today: RIFE was parity-locked and shipping at
+v0.8.0 the whole time; the gap was registration, not the model. Factor 2 default (one synthesized
+midpoint per adjacent pair at t=0.5); ≤ 1080p runs whole-frame, above it the package's tiler bounds
+memory (tile 1024 / overlap 128). Output is HEVC via frame-stream-native's **software**-encoder
+default — load-bearing under AB-B-0002 (hardware HEVC right after Metal work stalls, and panics
+quarantined builds on teardown); no Forge surface may opt back into hardware. Smoke (M5 Max 128 GB,
+Release, software encode): 1080p H.264 14.06 s fixture → ×2 = 447 frames @ 31.58 fps (exactly 2× the
+source 15.79), duration preserved, **143.4 s wall = 0.32 s/output frame**, peak `phys_footprint`
+**3.58 GB**; first-run weight materialization (~22 MB) ≈ 2.3 s. Treat it as a long job: ~0.3 s per
+output frame at 1080p, and the software encode is part of why — that price buys not panicking the
+machine.
 
 ✅ **A second `imageUpscale` backend exists for macOS 27+ hosts: CoreAI/ANE Real-ESRGAN**
 (`coreai-realesrgan-swift` ≥ 0.2.0, product `CoreAIRealESRGAN` — MLXToolKit-only, zero MLX). ForgeCore

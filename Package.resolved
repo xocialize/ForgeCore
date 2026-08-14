@@ -1,5 +1,5 @@
 {
-  "originHash" : "0be5cb5890441e47c420d682f09b4922b45e71174a6fded905bf2d39e9a260c8",
+  "originHash" : "e2700810e49882ba5a32b810e849755e220eaa8ff09835f38751f627bbffb1a0",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -233,6 +233,15 @@
       "state" : {
         "revision" : "dd691429439b6996915f00ba3205c29b79aeec8d",
         "version" : "0.1.0"
+      }
+    },
+    {
+      "identity" : "mlx-rife-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/xocialize/mlx-rife-swift.git",
+      "state" : {
+        "revision" : "9c5e168bbd2a06f4de57c3b7ad7cb2a978603ace",
+        "version" : "0.8.0"
       }
     },
     {
