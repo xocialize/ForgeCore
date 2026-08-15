@@ -1,5 +1,5 @@
 {
-  "originHash" : "e2700810e49882ba5a32b810e849755e220eaa8ff09835f38751f627bbffb1a0",
+  "originHash" : "75dd8f986767aaea6e0fbaf9d9d1838575756655bfd95c681533a6502e668911",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -42,8 +42,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/ForgeOptimizerKit.git",
       "state" : {
-        "revision" : "9c917f49fc284dd96d3ae6f15392a5fcf0cbdf3c",
-        "version" : "0.5.0"
+        "revision" : "4c29cad91141b1296e9bfb6981d7b1dadd22eb6d",
+        "version" : "0.11.0"
       }
     },
     {
@@ -96,8 +96,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/media-bridge.git",
       "state" : {
-        "revision" : "43cedc3dabfc2afa0a6ac9c5ff5d6ca0f3425d11",
-        "version" : "0.13.0"
+        "revision" : "ae0708825366a568b88f31ff53575076e37b260b",
+        "version" : "0.32.0"
       }
     },
     {
@@ -287,6 +287,15 @@
       "state" : {
         "revision" : "0bb916c67f4b9e5c682cbe02a42c701c93ab5021",
         "version" : "0.31.6"
+      }
+    },
+    {
+      "identity" : "mlx-vjepa2-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/xocialize/mlx-vjepa2-swift.git",
+      "state" : {
+        "revision" : "af61d1334c8f5ddcb5c6c40d8668f4cd9914c805",
+        "version" : "0.5.0"
       }
     },
     {

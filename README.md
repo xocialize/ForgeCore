@@ -1,6 +1,6 @@
 # ForgeCore
 
-The MLX seam for Forge: the engine service, the image-coding helper, and the six engine-backed provider
+The MLX seam for Forge: the engine service, the image-coding helper, and the engine-backed provider
 adapters — extracted so **more than one app can consume one capability surface**.
 
 Category **B** (engine adapters) under `XocializeForge/CLAUDE.md` § *Package categories*. It may import
@@ -39,6 +39,38 @@ Three ordering facts that are easy to get wrong, and each cost a bug once:
 3. **Never write `GPU.set(cacheLimit:)` or `MLX.Memory.cacheLimit`.** Since engine 0.21.0 the buffer pool
    is bounded at `MLXServeEngine` construction; an app-side write fights it. Read
    `engine.appliedGPUCacheLimitBytes` to see what was applied.
+
+## The planner hint (§6.3) ships inert — deliberately
+
+`EngineContentHintProvider` implements `ForgeOptimizerKit`'s `ContentHintProvider` over V-JEPA2
+`contentClassify`, so the optimizer can classify a clip *before* its first quality search instead of
+discovering the content class from that search's landing and paying a second one.
+
+**It cannot currently change anything, and that is the shipped behavior.** Every hint's confidence is
+clamped to `inertConfidenceCeiling` (0.5), below the Kit's `HintedStartPolicy.minConfidence` (0.9), so
+the planner observes each classification and acts on none of it. The clamp is unconditional — no
+parameter, no environment variable — because the alternative is worse than useless: an adapter
+reporting high confidence from an unfitted head would be laundering a guess through the very gate that
+exists to catch guesses. LESSONS' rule is that *the search's landing IS a content classifier; behavior
+outranks the axis label*, so a number the 0.9 gate can be honest about has to be earned against
+encoder behavior first.
+
+Two consequences worth stating plainly:
+
+- **Injecting it today costs and buys nothing yet.** Each classification pays a ~1.2 GB fp32 V-JEPA2
+  load plus a full copy of the input, and saves no search. The one reason to inject it now is to
+  collect calibration rows — pass `observe:` and pair each `[1024]` embedding with that item's
+  optimize receipt. An app that just wants faster optimize leaves `hintProvider` nil and gets the
+  Kit's behavioral ratchet for free.
+- **The tags are not the signal and never will be.** V-JEPA2's checkpoint ships no label names, so
+  its top-k comes back as bare `ssv2_<index>` ids from an SSv2 hand-object action vocabulary that is
+  semantically wrong for signage. `GraphicProbe` reads the pooled router embedding. Do not build a
+  label→class mapping; `MODEL-CATALOG.md` has said so since the port.
+
+Unlocking is the last step of the work order, in this order: fit the logistic probe on
+behaviorally-labeled rows → receipt the held-out disagreement rate → raise the ceiling in
+`EngineContentHintProvider.swift`. The Kit-side post-hoc audit (`hint_outcome`) stays on forever
+afterward; it is the drift alarm. Full protocol: `Docs/VJEPA2-HINT-ADAPTER.md`, AB-T-0045.
 
 `registerAll()` is eager and records a `RegistrationOutcome` per model rather than failing lazily inside
 the first inference. A failure is a fact to display — under `.permissiveOnly` + `.blocking`,

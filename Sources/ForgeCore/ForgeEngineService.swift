@@ -36,6 +36,7 @@ import MLXInpaint
 import MLXSEARAFT
 import MLXEdgeTAM
 import MLXRIFE
+import MLXVJEPA2
 
 let log = Logger(subsystem: "com.xocialize.ForgeCore", category: "ForgeCore")
 
@@ -97,6 +98,14 @@ public enum ForgeModel: String, CaseIterable, Sendable {
     // (`Adapters/EngineFrameInterpolator.swift`).
     case frameInterpolate  // RIFE 4.25
 
+    // ── contentClassify (AB-T-0045) ──
+    // Registered 2026-08-15 as the §6.3 planner hint's feature extractor. ⚠️ Like `qualityScore`
+    // this is an **assessment, not a transform** — it changes no pixels. What it produces that
+    // matters is the pooled **[1024] router embedding**; its `ssv2_<index>` tags are ids from the
+    // SSv2 hand-object action vocabulary, which ships no label names and is semantically wrong for
+    // signage. Never map a tag to a content class — `EngineContentHintProvider` reads the embedding.
+    case contentClassify   // V-JEPA2 ViT-L
+
     public var modelName: String {
         switch self {
         case .restore:    return "NAFNet"
@@ -119,6 +128,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .faceRestoreVQ:    return "RestoreFormer++"
         case .defectDetect:     return "BOPBTL"
         case .frameInterpolate: return "RIFE"
+        case .contentClassify:  return "V-JEPA2"
         }
     }
 
@@ -146,6 +156,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .relight: return .imageRelight
         case .defectDetect: return .defectDetect
         case .frameInterpolate: return .frameInterpolate
+        case .contentClassify: return .contentClassify
         }
     }
 }
@@ -522,6 +533,14 @@ public final class ForgeEngineService {
                 // teardown. No Forge surface may set FRAMESTREAM_ENCODE=hardware.
                 id = try await engine.register(RIFEInterpolatePackage.registration,
                                                configuration: RIFEConfiguration())
+            case .contentClassify:
+                // Package defaults on purpose (the BRIDGE-067 discipline): the repo, the 16-frame
+                // uniform sampling and the 256² preprocessing are the port's parity-locked pipeline,
+                // not ForgeCore's to second-guess. `topK` is left at 5 even though the planner reads
+                // only the embedding — the tags cost nothing and travel into receipts verbatim as
+                // provenance for the calibration rows.
+                id = try await engine.register(VJEPA2ContentClassifyPackage.registration,
+                                               configuration: VJEPA2Configuration())
             case .qualityScore:
                 // `maxPatches` is a coverage/cost knob, not a quality knob: the scorer mean-pools up to
                 // N native-scale 224² patches. ⚠️ **The default 8 is too few for a 2048² frame** — 8

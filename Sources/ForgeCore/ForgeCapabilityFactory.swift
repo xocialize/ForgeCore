@@ -33,6 +33,16 @@ public struct ForgeCapabilities {
     public let flow: EngineFlowProvider
     /// Shared by Extract and Erase — one EdgeTAM registration, two capabilities.
     public let promptMask: EnginePromptMaskProvider
+    /// Optimize's §6.3 planner hint — V-JEPA2 (`ForgeOptimizerKit.ContentHintProvider`).
+    ///
+    /// 🚨 **Injecting this today costs and buys nothing yet, by design.** The adapter ships inert
+    /// (confidence clamped below the Kit's 0.9 gate — see `EngineContentHintProvider`), so a hint
+    /// never raises a floor and never saves a search, while each classification still pays a
+    /// ~1.2 GB V-JEPA2 load plus a full copy of the input. The one reason to inject it now is to
+    /// **collect calibration rows** (pass `observe:` and pair each embedding with that item's
+    /// optimize receipt — AB-T-0045 step 4). An app that just wants faster optimize should leave
+    /// `hintProvider` nil: the Kit's behavioral class ratchet is the fallback and is free.
+    public let contentHint: EngineContentHintProvider
 
     /// The four V1 capabilities and whether the models they need are registered. A capability with an
     /// unavailable Tier-2 model is not necessarily dead — Extract and Erase still have their Tier-0/1
@@ -60,5 +70,6 @@ public struct ForgeCapabilities {
         self.inpaint    = EngineInpaintProvider(service: service)
         self.flow       = EngineFlowProvider(service: service)
         self.promptMask = EnginePromptMaskProvider(service: service)
+        self.contentHint = EngineContentHintProvider(service: service)
     }
 }

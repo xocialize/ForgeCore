@@ -26,9 +26,13 @@ let package = Package(
     ],
     dependencies: [
         // A — net-clean Kits owning the provider protocols these adapters implement.
-        // 0.5.0 = the first tag carrying `webOptimize` (PNG · H.264+AAC web deliverables) — the floor
-        // is the guarantee that ForgeCore's transitive surface includes the verb.
-        .package(url: "https://github.com/xocialize/ForgeOptimizerKit.git", from: "0.5.0"),
+        // 0.11.0 = the first tag carrying the §6.3 planner-hint seam (`ContentHintProvider` /
+        // `ContentHint` / `HintedStartPolicy`), which `EngineContentHintProvider` implements. It
+        // supersedes the old 0.5.0 floor (`webOptimize`); that verb is still in the surface, a
+        // higher floor being the stronger guarantee. ⚠️ URL-at-a-tag, never a path — mixing the two
+        // for one package identity jams the whole graph at the lowest pin any consumer holds
+        // (`Docs/LESSONS.md` "SPM gotcha", 2026-06-24).
+        .package(url: "https://github.com/xocialize/ForgeOptimizerKit.git", from: "0.11.0"),
         .package(url: "https://github.com/xocialize/ExtractKit.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/ColorizeKit.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/EraseKit.git", from: "0.2.0"),
@@ -75,6 +79,13 @@ let package = Package(
         // registration existed anywhere, so the capability was unreachable by every app until
         // 2026-08-14. 0.8.0 = the CAN-gate retrofit tag.
         .package(url: "https://github.com/xocialize/mlx-rife-swift.git", from: "0.8.0"),
+        // contentClassify — V-JEPA2 ViT-L, the §6.3 planner hint's feature extractor (AB-T-0045).
+        // 0.5.0 = the CAN-gate retrofit tag, the same floor discipline RIFE gets; the adapter sketch
+        // said ≥ 0.2.0 before the gate landed. 🔑 It is here for the **[1024] router embedding**, not
+        // the tags: the SSv2 attentive probe emits bare `ssv2_<index>` ids (the checkpoint ships no
+        // label names) and that vocabulary is hand-object actions, semantically wrong for signage.
+        // Never build a label→class mapping from it.
+        .package(url: "https://github.com/xocialize/mlx-vjepa2-swift.git", from: "0.5.0"),
     ],
     targets: [
         .target(
@@ -107,6 +118,7 @@ let package = Package(
                 .product(name: "MLXSEARAFT", package: "mlx-sea-raft-swift"),
                 .product(name: "MLXEdgeTAM", package: "mlx-edgetam-swift"),
                 .product(name: "MLXRIFE", package: "mlx-rife-swift"),
+                .product(name: "MLXVJEPA2", package: "mlx-vjepa2-swift"),
             ]
         ),
         // ⚠️ Run with `swift test --build-system swiftbuild`. Importing MLX inherits the metallib

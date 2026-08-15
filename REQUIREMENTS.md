@@ -69,6 +69,7 @@ cares about the memory ceiling must set `wholeFrameMaxPixels` itself** (`RealESR
 | SigLIP2-IQA | `imageQualityScore` | Metal GPU | 26.0 | declared |
 | BOPBTL | `defectDetect` | CPU (pinned — see note) | 26.0 | **measured**: 1.63 GB active / 3.9 GB at the 2 GiB cache, ~1 s/image |
 | RIFE 4.25 | `frameInterpolate` | Metal GPU | 26.0 | declared: fp32 resident 150 MB + peak 4.0 GB — **measured 3.58 GB** phys at 1080p whole-frame |
+| V-JEPA2 ViT-L | `contentClassify` | Metal GPU | 26.0 | declared split: fp32 resident **1.3 GB** + peak activation **1.7 GB** (activation is an ESTIMATE — in-app `phys_footprint` re-baseline pending) |
 
 ⚠️ **BOPBTL runs on the CPU stream by its core's own pin**: the Metal fp32 conv2d kernel is wrong in
 its geometry window (inC ≥ 128 ∧ outC ≥ 128 ∧ spatial ≥ ~64 — receipted in `mlx-bopbtl-swift`, with
@@ -99,6 +100,30 @@ source 15.79), duration preserved, **143.4 s wall = 0.32 s/output frame**, peak 
 **3.58 GB**; first-run weight materialization (~22 MB) ≈ 2.3 s. Treat it as a long job: ~0.3 s per
 output frame at 1080p, and the software encode is part of why — that price buys not panicking the
 machine.
+
+🚨 **`contentClassify` IS REGISTERED on `main` as of 2026-08-15 (AB-T-0045; the 21st registration —
+tag pending) — and its adapter is deliberately INERT, so an integrator must not size a machine for it
+by default.** V-JEPA2 backs the
+optimizer's §6.3 planner hint (`EngineContentHintProvider` → `ForgeOptimizerKit.ContentHintProvider`),
+which classifies a clip before its first quality search so the search can start at the class floor
+instead of discovering the class from its own landing and paying a second search. The Kit half is
+measured: **−50% wall on graphic masters, byte-identical deliverable** (AB-R-0056).
+
+⚠️ **None of that saving is available yet.** The adapter clamps every hint's confidence to 0.5, under
+the Kit's 0.9 action gate, until the embedding probe is fitted against encoder behavior and its
+held-out disagreement rate is receipted. So today the capability is **pure cost** wherever it is
+injected: ~1.3 GB resident for the ViT plus a full copy of the input per classification. Inject it only
+to collect calibration rows; leave `hintProvider` nil otherwise and the Kit's behavioral ratchet covers
+the case for free.
+
+⚠️ **Cost note the footprint table cannot express — the classify contract takes BYTES, not a URL.**
+`ContentClassifyRequest` carries a canonical `Video` artifact, and the package writes those bytes back
+out to a temp file to run AVFoundation's frame sampler. So one classification costs a read plus a full
+disk copy of the source, while the sampling it enables is ~10² ms — on a 429 MB master the transport
+dominates the work by orders of magnitude. The adapter maps rather than reads the file (memory stays
+honest) and refuses inputs over 2 GiB rather than pay silently. The real fix is a URL form of the
+contract, filed as an ask against the engine/video area; until it lands, this is a documented tax, not
+a solved problem.
 
 ✅ **A second `imageUpscale` backend exists for macOS 27+ hosts: CoreAI/ANE Real-ESRGAN**
 (`coreai-realesrgan-swift` ≥ 0.2.0, product `CoreAIRealESRGAN` — MLXToolKit-only, zero MLX). ForgeCore

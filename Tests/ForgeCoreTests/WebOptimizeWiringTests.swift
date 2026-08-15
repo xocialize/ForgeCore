@@ -1,7 +1,7 @@
 //
 //  WebOptimizeWiringTests.swift — ForgeCore
 //
-//  The cross-package wiring for the web-deliverable verb (ForgeOptimizerKit 0.5.0's `webOptimize`).
+//  The cross-package wiring for the web-deliverable verb (`webOptimize`, ForgeOptimizerKit 0.5.0+).
 //  ForgeCore does not wrap the verb — it supplies the providers a host injects into `ForgeOptimizer` —
 //  so "properly wired" means exactly two things, both provable without weights:
 //
@@ -49,20 +49,49 @@ struct WebOptimizeWiringTests {
             Issue.record("expected .optimized, got \(r.status)")
             return
         }
-        #expect(r.outputType == .png)
-        #expect(r.recipe.codec == "PNG")
-        // The measured round-trip rode the receipt through this wiring — that is the assertion.
-        // The strict ≥99.5 losslessness claim lives in media-bridge's suite against a clean sRGB
-        // source; a JPEG-decoded reference pays a colorspace re-tag rounding of a few tenths
-        // (this fixture measures ≈99.26), which is precisely why the score is measured, not asserted.
-        let score = try #require(r.after.qualityScore)
-        #expect(score > 99, "the PNG round-trip must measure ~lossless, got \(score)")
         guard case .file(let out) = r.output else {
             Issue.record("expected .file output")
             return
         }
-        #expect(out.pathExtension == "png")
         #expect(FileManager.default.fileExists(atPath: out.path))
+
+        // ⚠️ **This test used to assert PNG specifically, and that assertion went stale at Kit
+        // 0.6.0** (`c55f299` — *web stills race JPEG against PNG*), which ForgeCore only met when
+        // its floor moved 0.5.0 → 0.11.0 for the planner-hint seam. The web still is now a RACE:
+        // lossless PNG always runs, a JPEG floor search runs alongside unless the image carries
+        // true transparency, and the smaller deliverable that keeps its guarantee ships. This
+        // fixture is textured photo-like content, so JPEG wins it — correctly.
+        //
+        // So the wiring assertion is no longer "which codec" — that is the Kit's outcome to decide
+        // per image, and pinning it here would re-break on the next legitimate tuning. What
+        // ForgeCore's seam must guarantee is that a deliverable comes back **self-consistent**:
+        // the receipt's type, the codec label, the written extension and the floor semantics all
+        // describe the same bytes. The Kit's own comment names why that matters — racing to a
+        // different codec than the one named would write mislabeled bytes.
+        let score = try #require(r.after.qualityScore)
+        switch r.outputType {
+        case .png:
+            #expect(r.recipe.codec == "PNG")
+            #expect(out.pathExtension == "png")
+            // Lossless, so no floor is claimed and none is needed. The strict ≥99.5 claim lives in
+            // media-bridge's suite against a clean sRGB source; a JPEG-decoded reference pays a
+            // colorspace re-tag rounding of a few tenths (≈99.26 measured), which is exactly why
+            // the score is measured rather than asserted at 100.
+            #expect(r.recipe.qualityFloor == nil)
+            #expect(score > 99, "the PNG round-trip must measure ~lossless, got \(score)")
+        case .jpeg:
+            #expect(r.recipe.codec == "JPEG")
+            #expect(out.pathExtension == "jpg")
+            // JPEG wins only by clearing the preset floor AND being smaller — both are receipt
+            // claims, so both get checked here rather than taken on trust.
+            #expect(r.recipe.qualityFloor == QualityTarget.balanced.floor)
+            #expect(score >= QualityTarget.balanced.floor,
+                    "JPEG may only win by MEETING the floor, got \(score)")
+            #expect(r.after.bytes < r.before.bytes,
+                    "JPEG may only win by being smaller: \(r.after.bytes) vs \(r.before.bytes)")
+        default:
+            Issue.record("web still must be PNG or JPEG, got \(String(describing: r.outputType))")
+        }
     }
 
     // MARK: - Fixtures
