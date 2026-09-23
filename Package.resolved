@@ -1,5 +1,5 @@
 {
-  "originHash" : "75dd8f986767aaea6e0fbaf9d9d1838575756655bfd95c681533a6502e668911",
+  "originHash" : "0149d9877d52734b7268ba0ac20a1add4a193739fd4c5dbaa8edd37ea4ac19a2",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -150,8 +150,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-edgetam-swift.git",
       "state" : {
-        "revision" : "84b6a75a67f41aec5ef539120f20662970abfde1",
-        "version" : "0.4.1"
+        "revision" : "2db504511f3fbe1ded3dd75a165942789dca14e7",
+        "version" : "0.5.0"
       }
     },
     {
