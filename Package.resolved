@@ -1,5 +1,5 @@
 {
-  "originHash" : "0149d9877d52734b7268ba0ac20a1add4a193739fd4c5dbaa8edd37ea4ac19a2",
+  "originHash" : "78bc2bc4343f49cf4ba7fb1867aea84da700b9812ab44cd8d1f64dda692bcea5",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -8,6 +8,15 @@
       "state" : {
         "revision" : "c4f7d7d253e08ac829cf5670e364b95cec8fa08c",
         "version" : "0.1.0"
+      }
+    },
+    {
+      "identity" : "designscaffold",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/xocialize/DesignScaffold",
+      "state" : {
+        "revision" : "ca247ee4689027980182c09fcfebc45f81825e57",
+        "version" : "0.24.0"
       }
     },
     {
@@ -150,8 +159,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-edgetam-swift.git",
       "state" : {
-        "revision" : "2db504511f3fbe1ded3dd75a165942789dca14e7",
-        "version" : "0.5.0"
+        "revision" : "efaa616f3b2a2b35a3c16cbe2b5f6a24cef2832e",
+        "version" : "0.6.0"
       }
     },
     {
@@ -159,8 +168,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-engine-swift.git",
       "state" : {
-        "revision" : "fa23408a4eaea6dc20db6ff4459e73003e666d1a",
-        "version" : "0.44.0"
+        "revision" : "ef19ad73b6efeab0f599791706d6d141b5634b08",
+        "version" : "0.62.0"
       }
     },
     {
