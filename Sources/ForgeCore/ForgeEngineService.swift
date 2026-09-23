@@ -332,8 +332,11 @@ public final class ForgeEngineService {
                 restoreVariant: NAFNetVariant = .signage,
                 videoTemporalTier: VideoTemporalTier = .default,
                 bankResidencyBudgetBytes: Int? = nil,
-                externalRegistrations: [ExternalRegistration] = []) {
-        self.engine = MLXServeEngine(policy: policy, licenseEnforcement: enforcement)
+                externalRegistrations: [ExternalRegistration] = [],
+                governor: MemoryGovernor? = nil) {
+        // `governor` nil = the engine's device default. A fixed budget is for drills: an app that declares a canvas
+        // (ForgeExternalTenant) proves its shrink path under a budget that only fits if the canvas sheds.
+        self.engine = MLXServeEngine(policy: policy, licenseEnforcement: enforcement, governor: governor)
         self.restoreVariant = restoreVariant
         self.videoTemporalTier = videoTemporalTier
         self.bankResidencyBudgetBytes = bankResidencyBudgetBytes

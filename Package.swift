@@ -42,7 +42,8 @@ let package = Package(
 
         // The engine. v0.37.0 is the FIRST tag carrying `licenseEnforcement` (contract 1.28.0) —
         // do not lower this floor, or `.blocking` silently stops being expressible.
-        .package(url: "https://github.com/xocialize/mlx-engine-swift.git", from: "0.43.0"),
+        // 0.61.0: external tenants with a shrink REASON (contract 1.46.0) — ForgeExternalTenant needs it.
+        .package(url: "https://github.com/xocialize/mlx-engine-swift.git", from: "0.61.0"),
 
         // Model wrappers — the heavy pins.
         .package(url: "https://github.com/xocialize/mlx-nafnet-swift.git", from: "0.4.0"),
