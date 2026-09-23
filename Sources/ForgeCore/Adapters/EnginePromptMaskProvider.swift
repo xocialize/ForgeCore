@@ -13,6 +13,7 @@
 import Foundation
 import CoreGraphics
 import MaskKit
+import MLXEdgeTAM
 import MLXServeCore
 import MLXToolKit
 
@@ -22,6 +23,10 @@ public final class EnginePromptMaskProvider: PromptMaskProvider {
     public nonisolated let name = "EdgeTAM"
 
     private let service: ForgeEngineService
+    /// Anti-aliased edges (EdgeTAM ≥ 0.5.0 `softMatte`): a ~1–2 px coverage ramp whose 0.5 level is exactly the binary
+    /// edge, 0/1 everywhere else. Off by default — the binary matte is what existing callers were validated against.
+    /// Not a sigmoid of the logits: that measured as a ~20 px ramp with background haze (AB-T-0171).
+    public var softEdges = false
 
     public init(service: ForgeEngineService) {
         self.service = service
@@ -33,7 +38,8 @@ public final class EnginePromptMaskProvider: PromptMaskProvider {
             image: try EngineImageCoding.pngImage(from: image),
             points: prompt.points.map { [Float($0.x), Float($0.y)] },
             pointLabels: prompt.points.map { $0.include ? 1 : 0 },
-            box: prompt.box.map { [Float($0.minX), Float($0.minY), Float($0.maxX), Float($0.maxY)] }
+            box: prompt.box.map { [Float($0.minX), Float($0.minY), Float($0.maxX), Float($0.maxY)] },
+            mode: softEdges ? EdgeTAMPackage.softMatte : nil
         )
         let response = try await service.engine.run(request, package: packageID)
         guard let segment = response as? PromptSegmentResponse else { throw PromptError.unexpectedResponse }
