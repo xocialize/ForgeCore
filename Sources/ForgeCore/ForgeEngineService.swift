@@ -79,8 +79,8 @@ public enum ForgeModel: String, CaseIterable, Sendable {
     // sixteen — every case below was a shipped, parity-gated package invisible to every app.
     // ⚠️ NONE of these change a default: NAFNet `.signage` remains the restore chain's backer
     // until BRIDGE-069 measures the head-to-head. Registration makes them REACHABLE, not chosen.
-    case deblurMotion      // FFTformer (fp32 — bf16 measured 30 dB of dtype error; ships fp32)
-    case restormerMotion   // Restormer .motionDeblur
+    case deblurMotion      // FFTformer (fp32 — bf16 measured 30 dB of dtype error; ships fp32). Registered, NOT a default route: −0.02 dB on real blur (C2, AB-T-0180)
+    case restormerMotion   // Restormer .motionDeblur — the `motionDeblur` route (C2: +1.29 dB on real blur)
     case restormerDefocus  // Restormer .defocusDeblur — the only shippable defocus deblur (C4)
     case restormerDenoise  // Restormer .realDenoise
     case denoiseStrength   // DRUNet — THE strength dial (σ as a continuous input; contract 1.30.0)
@@ -477,15 +477,23 @@ public final class ForgeEngineService {
             // each behaviour needs its own PackageID to be individually reachable/preparable
             // (BRIDGE-066 asked that the mechanism be recorded: it is per-registration config,
             // exactly the multi-package-per-capability pattern `upscale`/`upscaleQuality` set).
+            // 🔴 The explicit `id:` IS that mechanism. Without it the engine keys all three by the
+            // manifest's surface name ("restormer-restore"), and a re-registration under an existing id
+            // REPLACES it — so from 2026-07-31 until AB-T-0180 the last one (`.realDenoise`) answered
+            // for motion and defocus too, under their names. `upscale`/`upscaleQuality` never hit this
+            // because they are different packages. Pinned by `RegistrationIdentityTests`.
             case .restormerMotion:
                 id = try await engine.register(RestormerRestorePackage.registration,
-                                               configuration: RestormerConfiguration(variant: .motionDeblur))
+                                               configuration: RestormerConfiguration(variant: .motionDeblur),
+                                               id: "restormer-motion-deblur")
             case .restormerDefocus:
                 id = try await engine.register(RestormerRestorePackage.registration,
-                                               configuration: RestormerConfiguration(variant: .defocusDeblur))
+                                               configuration: RestormerConfiguration(variant: .defocusDeblur),
+                                               id: "restormer-defocus-deblur")
             case .restormerDenoise:
                 id = try await engine.register(RestormerRestorePackage.registration,
-                                               configuration: RestormerConfiguration(variant: .realDenoise))
+                                               configuration: RestormerConfiguration(variant: .realDenoise),
+                                               id: "restormer-real-denoise")
             case .denoiseStrength:
                 id = try await engine.register(DRUNetRestorePackage.registration,
                                                configuration: DRUNetConfiguration())
