@@ -67,7 +67,7 @@ cares about the memory ceiling must set `wholeFrameMaxPixels` itself** (`RealESR
 | SEA-RAFT | `opticalFlow` | Metal GPU | 26.0 | declared |
 | EdgeTAM | `promptSegment` | Metal GPU | 26.0 | declared |
 | SAM 2.1-S | `promptSegment` (quality, image only) | Metal GPU | 26.0 | declared split **0.25 GB** resident + **2.6 GB** activation — measured phys 2.35 GB at 1024², 2.79 GB at 1800×1200 (AB-T-0173); registered as `.promptMaskQuality`, id `sam21-prompt-segment` |
-| *(guard, not a model)* `EngineTextGuardedUpscaler` | text-legibility guard in front of `.upscaleQuality` (MaskKit 0.3.0 `TextLegibilityGuard`) | CPU (Vision) | 14.0 | ~0.3–1 s per 1024² tile grid; routes `.keepBase` / `.generative` / `.protectWords` (opt-in) — VOSR-EVAL §11 |
+| *(guard, not a model)* `EngineTextGuardedUpscaler` | text-legibility guard in front of `.upscaleQuality` (MaskKit 0.4.0 `TextLegibilityGuard`) | CPU (Vision) | 14.0 | assess ~0.1 s per 512² page after a one-time ~25 s Vision warm-up; routes `.generative` by default, `.keepBase` / `.protectWords` opt-in per measured tier pair — measured end to end 2026-09-26 (`GuardedUpscaleLiveTests`): with SeedVR2 ×2 + Real-ESRGAN ×2 the generative route read best on every ScreenSR page and the base tier read worse than the input on dense text (VOSR-EVAL §11) |
 | SigLIP2-IQA | `imageQualityScore` | Metal GPU | 26.0 | declared |
 | BOPBTL | `defectDetect` | CPU (pinned — see note) | 26.0 | **measured**: 1.63 GB active / 3.9 GB at the 2 GiB cache, ~1 s/image |
 | RIFE 4.25 | `frameInterpolate` | Metal GPU | 26.0 | declared: fp32 resident 150 MB + peak 4.0 GB — **measured 3.58 GB** phys at 1080p whole-frame |

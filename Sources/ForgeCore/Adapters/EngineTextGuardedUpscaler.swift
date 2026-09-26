@@ -7,16 +7,20 @@
 //
 //  Why (VOSR-EVAL §10–§11, 2026-09-26): a generative upscaler fixes more wrong words than it breaks, but turns
 //  ~10 % of the words the input already reads with certainty into plausible wrong words ("Mummie" → "Manunie").
-//  For signage that is the failure that matters. The measured policy that removes it without making anything
-//  else worse is the image-level DOCUMENT GATE: a page that already reads as legible text goes to the
-//  non-generative tier whole (corruption 59 → 3 on such pages; the gate never fired on 1,200 illegible inputs).
-//  Word-level compositing is available as an opt-in (`policy.wordProtection`) and measured net-negative off
-//  dense legible pages — a mixed-fidelity line is a new degradation for the recognizer.
+//  For signage that is the failure that matters. Against VOSR2 at ×1 the image-level document gate was the
+//  policy that removed it without making anything else worse.
+//
+//  🚨 Measured END TO END through THIS adapter (`GuardedUpscaleLiveTests`, SeedVR2-3B int8 ×2 + Real-ESRGAN ×2,
+//  three ScreenSR pages, word-F1 vs the HR page): the generative route read best on every page (0.937 / 0.913 /
+//  0.651 vs the input's 0.937 / 0.846 / 0.116) and the base tier read WORSE than the un-restored input on the
+//  dense pages (0.800 / 0.633 — Real-ESRGAN breaks and merges small strokes). So for this tier pair the gate
+//  would have made text worse. Routing is tier- and scale-specific; both routes are OPT-IN in the policy, and a
+//  tier pair earns a route only by being measured through this adapter (the live test is the harness).
 //
 //  Three routes, decided on the INPUT before any model runs:
-//    .keepBase      — a legible document page → the base tier alone (no patchwork, no 3B model spun up);
 //    .generative    — the default → the generative tier alone;
-//    .protectWords  — opt-in → both tiers, composited under the glyph-proportional word mask.
+//    .keepBase      — opt-in (`documentGate`) → a legible document page → the base tier alone;
+//    .protectWords  — opt-in (`wordProtection`) → both tiers, composited under the glyph-proportional word mask.
 //
 
 import Foundation
@@ -54,7 +58,8 @@ public final class EngineTextGuardedUpscaler {
     }
 
     private let service: ForgeEngineService
-    /// The guard's policy — MaskKit's measured defaults: document gate on, word protection OFF.
+    /// The guard's policy — MaskKit's defaults route `.generative` for everything; `documentGate` and
+    /// `wordProtection` are opt-in per measured tier pair.
     public var policy: TextLegibilityGuard.Policy
     /// The generative tier — SeedVR2-3B today; the VOSR2 registration when it lands (AB-T-0184).
     public var generative: ForgeModel

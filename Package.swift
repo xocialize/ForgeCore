@@ -36,7 +36,7 @@ let package = Package(
         .package(url: "https://github.com/xocialize/ExtractKit.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/ColorizeKit.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/EraseKit.git", from: "0.2.0"),
-        .package(url: "https://github.com/xocialize/MaskKit.git", from: "0.3.0"),
+        .package(url: "https://github.com/xocialize/MaskKit.git", from: "0.4.0"),
         // 0.13.0 = ImageQualityTarget.encodePNG + VideoQualityTarget.EncodeProfile (the web tier).
         .package(url: "https://github.com/xocialize/media-bridge.git", from: "0.13.0"),
 

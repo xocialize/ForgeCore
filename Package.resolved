@@ -1,5 +1,5 @@
 {
-  "originHash" : "58711110aa41c342a55e3ac482aa843cf9b86163d0a39eb3e15121ee08629c01",
+  "originHash" : "5541b1849767913180012b26885399a6290368387b1a896f60e6546b4b3ed6d8",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -87,8 +87,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/MaskKit.git",
       "state" : {
-        "revision" : "8b95ed543601a3d0f18dd73673389130ec707630",
-        "version" : "0.3.0"
+        "revision" : "db4c9dae9e09a67bfb798683e30e979f9338ef26",
+        "version" : "0.4.0"
       }
     },
     {
