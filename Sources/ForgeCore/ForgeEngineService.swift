@@ -72,6 +72,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
     case inpaint        // LaMa / MI-GAN
     case flow           // SEA-RAFT
     case promptMask     // EdgeTAM
+    case promptMaskQuality // SAM 2.1-S — the Quick Select QUALITY tier, same capability (AB-A-0105 / AB-T-0173)
     case qualityScore   // SigLIP2 NR-IQA — the no-reference oracle, not a transform
 
     // ── The frame-restore wave (BRIDGE-066), face pair (064-face) and relight (BRIDGE-067) ──
@@ -116,6 +117,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .inpaint:    return "LaMa / MI-GAN"
         case .flow:       return "SEA-RAFT"
         case .promptMask: return "EdgeTAM"
+        case .promptMaskQuality: return "SAM 2.1"
         case .qualityScore: return "SigLIP2-IQA"
         case .deblurMotion:     return "FFTformer"
         case .restormerMotion:  return "Restormer (motion)"
@@ -149,6 +151,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .inpaint:    return .imageInpaint
         case .flow:       return .opticalFlow
         case .promptMask: return .promptSegment
+        case .promptMaskQuality: return .promptSegment
         case .qualityScore: return .imageQualityScore
         case .deblurMotion, .restormerMotion, .restormerDefocus, .restormerDenoise,
              .denoiseStrength, .denoiseBlind, .faceRestore, .faceRestoreVQ:
@@ -534,6 +537,17 @@ public final class ForgeEngineService {
             case .promptMask:
                 id = try await engine.register(EdgeTAMPackage.registration,
                                                configuration: EdgeTAMConfiguration())
+            case .promptMaskQuality:
+                // SAM 2.1-Small (mlx-edgetam-swift 0.6.0, AB-T-0173): the Quick Select QUALITY tier — a belly
+                // click selects the whole fox (IoU 0.968 vs EdgeTAM 0.008) and a click on one gate square selects
+                // only that square. Image only: EdgeTAM stays the fast default and the only `trackObject`. Same
+                // request/response, same `softMatte` mode, so `EnginePromptMaskProvider` serves both through
+                // `model:`. Declared split 0.25 GB resident + 2.6 GB activation (measured phys 2.35 GB at 1024²).
+                // Explicit id: two packages, two PackageIDs — never keyed by a manifest surface name that a
+                // sibling might share (the Restormer lesson, AB-L-0160).
+                id = try await engine.register(SAM21Package.registration,
+                                               configuration: SAM21Configuration(),
+                                               id: "sam21-prompt-segment")
             case .frameInterpolate:
                 // Package defaults on purpose (the BRIDGE-067 discipline): factor 2, and the tiling
                 // geometry (whole-frame ≤ 1080p, tile 1024 / overlap 128 above) is the package's own

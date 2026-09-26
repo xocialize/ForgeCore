@@ -20,7 +20,11 @@ import MLXToolKit
 @MainActor
 public final class EnginePromptMaskProvider: PromptMaskProvider {
 
-    public nonisolated let name = "EdgeTAM"
+    /// Which `promptSegment` registration answers: `.promptMask` (EdgeTAM — fast, and the only video tracker)
+    /// or `.promptMaskQuality` (SAM 2.1-S — the quality tier: a single click lands first time on flat-shaded
+    /// subjects, AB-T-0173). Same request, same response, same `softMatte` mode constant.
+    public nonisolated let model: ForgeModel
+    public nonisolated let name: String
 
     private let service: ForgeEngineService
     /// Anti-aliased edges (EdgeTAM ≥ 0.5.0 `softMatte`): a ~1–2 px coverage ramp whose 0.5 level is exactly the binary
@@ -28,18 +32,21 @@ public final class EnginePromptMaskProvider: PromptMaskProvider {
     /// Not a sigmoid of the logits: that measured as a ~20 px ramp with background haze (AB-T-0171).
     public var softEdges = false
 
-    public init(service: ForgeEngineService) {
+    public init(service: ForgeEngineService, model: ForgeModel = .promptMask) {
+        precondition(model.capability == .promptSegment, "EnginePromptMaskProvider needs a promptSegment registration")
         self.service = service
+        self.model = model
+        self.name = model.modelName
     }
 
     public func mask(_ image: CGImage, prompt: MaskPrompt) async throws -> CGImage {
-        guard let packageID = service.packageID(for: .promptMask) else { throw PromptError.unavailable }
+        guard let packageID = service.packageID(for: model) else { throw PromptError.unavailable }
         let request = PromptSegmentRequest(
             image: try EngineImageCoding.pngImage(from: image),
             points: prompt.points.map { [Float($0.x), Float($0.y)] },
             pointLabels: prompt.points.map { $0.include ? 1 : 0 },
             box: prompt.box.map { [Float($0.minX), Float($0.minY), Float($0.maxX), Float($0.maxY)] },
-            mode: softEdges ? EdgeTAMPackage.softMatte : nil
+            mode: softEdges ? EdgeTAMPackage.softMatte : nil   // == SAM21Package.softMatte
         )
         let response = try await service.engine.run(request, package: packageID)
         guard let segment = response as? PromptSegmentResponse else { throw PromptError.unexpectedResponse }

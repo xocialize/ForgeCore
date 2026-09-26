@@ -33,6 +33,10 @@ public struct ForgeCapabilities {
     public let flow: EngineFlowProvider
     /// Shared by Extract and Erase — one EdgeTAM registration, two capabilities.
     public let promptMask: EnginePromptMaskProvider
+    /// Quick Select **quality** tier — SAM 2.1-S (`.promptMaskQuality`), image only. The same `PromptMaskProvider`
+    /// seam over a second `promptSegment` registration; a host offers it as "Best" beside EdgeTAM's "Fast", or
+    /// uses it for off-subject clicks where EdgeTAM's single-click recall is weak (AB-A-0105).
+    public let promptMaskQuality: EnginePromptMaskProvider
     /// Optimize's §6.3 planner hint — V-JEPA2 (`ForgeOptimizerKit.ContentHintProvider`).
     ///
     /// 🚨 **Injecting this today costs and buys nothing yet, by design.** The adapter ships inert
@@ -50,9 +54,9 @@ public struct ForgeCapabilities {
     public var qualityTierAvailability: [(capability: String, models: [ForgeModel], available: Bool)] {
         [
             ("Optimize", [.restore, .upscale], isRegistered(.restore) && isRegistered(.upscale)),
-            ("Extract",  [.matte, .promptMask, .flow], isRegistered(.matte)),
+            ("Extract",  [.matte, .promptMask, .promptMaskQuality, .flow], isRegistered(.matte)),
             ("Colorize", [.colorize, .flow], isRegistered(.colorize)),
-            ("Erase",    [.inpaint, .promptMask, .flow], isRegistered(.inpaint)),
+            ("Erase",    [.inpaint, .promptMask, .promptMaskQuality, .flow], isRegistered(.inpaint)),
         ]
     }
 
@@ -70,6 +74,7 @@ public struct ForgeCapabilities {
         self.inpaint    = EngineInpaintProvider(service: service)
         self.flow       = EngineFlowProvider(service: service)
         self.promptMask = EnginePromptMaskProvider(service: service)
+        self.promptMaskQuality = EnginePromptMaskProvider(service: service, model: .promptMaskQuality)
         self.contentHint = EngineContentHintProvider(service: service)
     }
 }

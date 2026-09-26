@@ -66,6 +66,7 @@ cares about the memory ceiling must set `wholeFrameMaxPixels` itself** (`RealESR
 | LaMa / MI-GAN | `imageInpaint` | Metal GPU | 26.0 | declared |
 | SEA-RAFT | `opticalFlow` | Metal GPU | 26.0 | declared |
 | EdgeTAM | `promptSegment` | Metal GPU | 26.0 | declared |
+| SAM 2.1-S | `promptSegment` (quality, image only) | Metal GPU | 26.0 | declared split **0.25 GB** resident + **2.6 GB** activation — measured phys 2.35 GB at 1024², 2.79 GB at 1800×1200 (AB-T-0173); registered as `.promptMaskQuality`, id `sam21-prompt-segment` |
 | SigLIP2-IQA | `imageQualityScore` | Metal GPU | 26.0 | declared |
 | BOPBTL | `defectDetect` | CPU (pinned — see note) | 26.0 | **measured**: 1.63 GB active / 3.9 GB at the 2 GiB cache, ~1 s/image |
 | RIFE 4.25 | `frameInterpolate` | Metal GPU | 26.0 | declared: fp32 resident 150 MB + peak 4.0 GB — **measured 3.58 GB** phys at 1080p whole-frame |
