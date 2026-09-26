@@ -2,20 +2,27 @@
 //  EngineTextGuardedUpscaler.swift
 //  ForgeCore
 //
-//  MaskKit's `TextLegibilityGuard` in front of the GENERATIVE stills upscale tier (SeedVR2-3B today, the VOSR2
-//  registration when it lands — AB-T-0184).
+//  MaskKit's `TextLegibilityGuard` in front of a GENERATIVE stills upscale tier — `.upscaleQuality` (SeedVR2-3B)
+//  or `.upscaleGenerative` (VOSR2, registered 2026-09-26; AB-T-0184/0185) — chosen per instance by `generative:`.
 //
 //  Why (VOSR-EVAL §10–§11, 2026-09-26): a generative upscaler fixes more wrong words than it breaks, but turns
 //  ~10 % of the words the input already reads with certainty into plausible wrong words ("Mummie" → "Manunie").
 //  For signage that is the failure that matters. Against VOSR2 at ×1 the image-level document gate was the
 //  policy that removed it without making anything else worse.
 //
-//  🚨 Measured END TO END through THIS adapter (`GuardedUpscaleLiveTests`, SeedVR2-3B int8 ×2 + Real-ESRGAN ×2,
-//  three ScreenSR pages, word-F1 vs the HR page): the generative route read best on every page (0.937 / 0.913 /
-//  0.651 vs the input's 0.937 / 0.846 / 0.116) and the base tier read WORSE than the un-restored input on the
-//  dense pages (0.800 / 0.633 — Real-ESRGAN breaks and merges small strokes). So for this tier pair the gate
-//  would have made text worse. Routing is tier- and scale-specific; both routes are OPT-IN in the policy, and a
-//  tier pair earns a route only by being measured through this adapter (the live test is the harness).
+//  🚨 Measured END TO END through THIS adapter (`GuardedUpscaleLiveTests`, three ScreenSR pages, Vision word-F1
+//  vs the HR page; input reads 0.937 / 0.846 / 0.116):
+//    SeedVR2-3B ×2 (2026-09-26 §11.1)   generative 0.937 / 0.913 / 0.651   keepBase 0.800 / 0.633 / 0.426
+//    VOSR2 ×2       (2026-09-26 §11.2)   generative 0.952 / 0.928 / 0.635   keepBase 0.800 / 0.633 / 0.426
+//    VOSR2 ×4                            generative 0.920 / 0.926 / 0.625   keepBase 0.778 / 0.000 / 0.356
+//    SeedVR2-3B ×4                       generative 0.902 / 0.862 / 0.623   (same base)
+//  The generative route read best on every page for BOTH tiers at BOTH scales, and the base tier (Real-ESRGAN)
+//  read worse than the un-restored input on the dense pages — it breaks and merges small strokes, and at ×4 it
+//  wiped page 090 to 0.000. The word composite sat between the two. So for these tier pairs the gate would have
+//  made text worse; both routes are OPT-IN in the policy, and a tier pair earns a route only by being measured
+//  through this adapter (the live test is the harness). The ×1 letter-rewrite hazard (AB-L-0172) is real but was
+//  measured against the un-restored input as the base, which this adapter's base tier is not — ×1 stays unmeasured.
+//  VOSR2 is the default generative tier since v0.23.0: it reads at least as well and runs ~2× faster at ×4.
 //
 //  Three routes, decided on the INPUT before any model runs:
 //    .generative    — the default → the generative tier alone;
@@ -61,7 +68,9 @@ public final class EngineTextGuardedUpscaler {
     /// The guard's policy — MaskKit's defaults route `.generative` for everything; `documentGate` and
     /// `wordProtection` are opt-in per measured tier pair.
     public var policy: TextLegibilityGuard.Policy
-    /// The generative tier — SeedVR2-3B today; the VOSR2 registration when it lands (AB-T-0184).
+    /// The generative tier: `.upscaleGenerative` (VOSR2, the default since v0.23.0 — measured through this adapter
+    /// at ×2 and ×4, VOSR-EVAL §11.2) or `.upscaleQuality` (SeedVR2-3B). The routes a tier pair earns are decided by
+    /// `GuardedUpscaleLiveTests` + the OCR check, never assumed from another pair.
     public var generative: ForgeModel
     /// The non-generative tier the protected words come from. Real-ESRGAN: feed-forward, deterministic —
     /// "conservative non-generative restoration inside the mask" (the N7 rule).
@@ -69,7 +78,7 @@ public final class EngineTextGuardedUpscaler {
 
     public init(service: ForgeEngineService,
                 policy: TextLegibilityGuard.Policy = .default,
-                generative: ForgeModel = .upscaleQuality,
+                generative: ForgeModel = .upscaleGenerative,
                 base: ForgeModel = .upscale) {
         precondition(generative.capability == .imageUpscale && base.capability == .imageUpscale)
         self.service = service

@@ -63,6 +63,9 @@ let package = Package(
         .package(url: "https://github.com/xocialize/mlx-realesrgan-swift.git", from: "0.7.0"),
     // The quality tier behind `imageUpscale` — a second backer, not a replacement.
     .package(url: "https://github.com/xocialize/mlx-seedvr2-swift.git", from: "0.9.1"),
+        // The GENERATIVE stills tier behind `imageUpscale` — VOSR2 (AB-T-0184/AB-T-0185): a third backer, beside
+        // Real-ESRGAN (fast) and SeedVR2 (quality/diffusion), never a replacement.
+        .package(url: "https://github.com/xocialize/mlx-vosr-swift.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/mlx-birefnet-swift.git", from: "0.4.0"),
         // 🔑 **The no-reference half of the two-oracle rule** (`CLAUDE.md`: *"SigLIP2 NR-IQA gates
         // whether to restore … SSIMULACRA2 gates how hard to compress"*). ForgeCore shipped the
@@ -112,6 +115,7 @@ let package = Package(
                 .product(name: "RestoreTier2", package: "ForgeRestoreKit"),
                 .product(name: "MLXRealESRGAN", package: "mlx-realesrgan-swift"),
                 .product(name: "MLXSeedVR2", package: "mlx-seedvr2-swift"),
+                .product(name: "MLXVOSR", package: "mlx-vosr-swift"),
                 .product(name: "MLXBiRefNet", package: "mlx-birefnet-swift"),
                 .product(name: "MLXSigLIP2IQA", package: "mlx-siglip2-iqa-swift"),
                 .product(name: "MLXDDColor", package: "mlx-ddcolor-swift"),

@@ -29,6 +29,7 @@ import MLXRestoreFormer
 import MLXBOPBTL
 import MLXRealESRGAN
 import MLXSeedVR2
+import MLXVOSR
 import MLXBiRefNet
 import MLXSigLIP2IQA
 import MLXDDColor
@@ -49,9 +50,10 @@ let log = Logger(subsystem: "com.xocialize.ForgeCore", category: "ForgeCore")
 /// The nine model packages Forge registers. One case per registration, *not* per capability —
 /// Optimize alone uses two (restore + upscale), and one flow registration feeds four consumers.
 ///
-/// 🔑 **`upscale` and `upscaleQuality` are two registrations behind ONE capability**, which is the
-/// engine's multi-package-per-`PackageID` pattern and the first place Forge uses it: Real-ESRGAN is the
-/// fast tier, SeedVR2-3B the quality tier, and the planner picks. Adding SeedVR2 does **not** displace
+/// 🔑 **`upscale`, `upscaleQuality` and `upscaleGenerative` are three registrations behind ONE capability**, which
+/// is the engine's multi-package-per-`PackageID` pattern and the first place Forge uses it: Real-ESRGAN is the
+/// fast tier, SeedVR2-3B the quality tier, VOSR2 the generative stills tier (2026-09-26), and the planner
+/// picks. Adding SeedVR2 does **not** displace
 /// Real-ESRGAN — `MODEL-CATALOG.md`'s standing rule is that when SeedVR2 isn't viable (memory, chip,
 /// file) `videoUpscale` routes to per-frame Real-ESRGAN: *same tool, lighter backer.*
 ///
@@ -67,6 +69,15 @@ public enum ForgeModel: String, CaseIterable, Sendable {
     case restore        // NAFNet
     case upscale        // Real-ESRGAN — the fast tier
     case upscaleQuality // SeedVR2-3B (int8) — the quality tier, same capability
+    // ── upscaleGenerative (AB-T-0184 / AB-T-0185) ──
+    // Registered 2026-09-26. VOSR2 (CSWRY/VOSR, CVPR 2026): a 1.4B one-step generative super-resolution DiT
+    // conditioned on DINOv2-L, ported to Swift/MLX (`mlx-vosr-swift`, e2e 115.5 dB vs the PyTorch oracle);
+    // the THIRD `imageUpscale` backer — the generative STILLS tier. Gated in VOSR-EVAL §10 (G1–G5 PASS,
+    // AB-R-0348): the first learned tier to beat the classical floor on SSIMULACRA2 in the JPEG regime, ×1
+    // restoration through ×4, 0.3 s per 512² tile. ⚠️ Generative: it REWRITES letters in already-legible
+    // small text (AB-L-0172) — reach it through `EngineTextGuardedUpscaler`, whose routes stay opt-in per
+    // measured tier pair; nothing routes to it by default. Weights: mlx-community/VOSR2-fp16 (int8 under budget).
+    case upscaleGenerative // VOSR2 (fp16; int8 below 7 GB) — the generative stills tier, same capability
     case matte          // BiRefNet
     case colorize       // DDColor
     case inpaint        // LaMa / MI-GAN
@@ -112,6 +123,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .restore:    return "NAFNet"
         case .upscale:    return "Real-ESRGAN"
         case .upscaleQuality: return "SeedVR2-3B"
+        case .upscaleGenerative: return "VOSR2"
         case .matte:      return "BiRefNet"
         case .colorize:   return "DDColor"
         case .inpaint:    return "LaMa / MI-GAN"
@@ -146,6 +158,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         // decision. ✅ The video contract IS wired as of 2026-07-31 — see `EngineVideoUpscaler` and
         // `videoTemporalTier` (the earlier "no app wires yet" note is retired).
         case .upscaleQuality: return .imageUpscale
+        case .upscaleGenerative: return .imageUpscale
         case .matte:      return .matting
         case .colorize:   return .imageColorize
         case .inpaint:    return .imageInpaint
@@ -470,6 +483,23 @@ public final class ForgeEngineService {
                                                    tileHalo: halo,
                                                    imageWholeFramePixels: wholeFrame,
                                                    bankResidencyBudgetBytes: bankResidencyBudgetBytes))
+            case .upscaleGenerative:
+                // VOSR2 (mlx-vosr-swift 0.1.0): fp16 is the default lane (49.3 dB vs the fp32 oracle); the package
+                // itself drops to its int8 DiT (46.7 dB) when the governor stamps less than 7 GB of headroom
+                // (BudgetAware), and tiles the VAE above 2048² of output. `defaultScale` 2 mirrors SeedVR2 so a
+                // request without a scale means the same thing on both generative tiers. The engine materializes
+                // mlx-community/VOSR2-fp16 (3.35 GB) into its store on first prepare. `FORGE_VOSR2_QUANT=int8|fp32`
+                // is a diagnostics lever only. Explicit id (the Restormer lesson, AB-L-0160).
+                let vosrQuant: Quant = {
+                    switch ProcessInfo.processInfo.environment["FORGE_VOSR2_QUANT"] {
+                    case "int8": return .int8
+                    case "fp32": return .fp32
+                    default: return .fp16
+                    }
+                }()
+                id = try await engine.register(VOSRUpscalePackage.registration,
+                                               configuration: VOSRConfiguration(quant: vosrQuant, defaultScale: 2),
+                                               id: "vosr2-upscale")
             case .matte:
                 id = try await engine.register(BiRefNetPackage.registration,
                                                configuration: BiRefNetConfiguration())
