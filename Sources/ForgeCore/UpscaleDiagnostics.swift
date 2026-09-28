@@ -49,8 +49,8 @@ extension ForgeEngineService {
     /// Run one image through a registered upscale tier, timing load and run separately.
     ///
     /// - Parameters:
-    ///   - model: which registration to exercise — `.upscale` (Real-ESRGAN, fast) or `.upscaleQuality`
-    ///     (SeedVR2-3B, quality). Both back `.imageUpscale`.
+    ///   - model: which registration to exercise — `.upscale` (Real-ESRGAN, fast), `.upscaleFidelity` (RealPLKSR),
+    ///     `.upscaleQuality` (SeedVR2-3B) or `.upscaleGenerative` (VOSR2). All four back `.imageUpscale`.
     /// - Throws: `DiagnosticsError.notRegistered` when the tier failed to register, carrying the
     ///   registration failure text rather than a bare nil — a license rejection and a missing weights
     ///   folder are different problems and the caller should be able to tell them apart.
@@ -63,7 +63,7 @@ extension ForgeEngineService {
         let raw = try EngineImageCoding.rawImage(from: image)
 
         // ⚠️ `prepare` is keyed by CAPABILITY with the package as a disambiguator — which matters here
-        // precisely because both tiers back `.imageUpscale`. Passing the package is not optional
+        // precisely because every tier backs `.imageUpscale`. Passing the package is not optional
         // politeness: omit it and the engine resolves whichever registration it likes, so a run labelled
         // "SeedVR2" could silently measure Real-ESRGAN. That would be an invisible wrong answer, which is
         // the failure mode this whole spike exists to avoid.

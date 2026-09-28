@@ -30,6 +30,7 @@ import MLXBOPBTL
 import MLXRealESRGAN
 import MLXSeedVR2
 import MLXVOSR
+import MLXRealPLKSR
 import MLXBiRefNet
 import MLXSigLIP2IQA
 import MLXDDColor
@@ -47,13 +48,13 @@ let log = Logger(subsystem: "com.xocialize.ForgeCore", category: "ForgeCore")
 /// footprint (6.26 GB) is the *tiled* figure, while its default path is whole-frame and measures
 /// **21.24 GB at 1080p**. The governor admits against the declaration, not against reality.
 ///
-/// The nine model packages Forge registers. One case per registration, *not* per capability —
+/// Every model package Forge registers. One case per registration, *not* per capability —
 /// Optimize alone uses two (restore + upscale), and one flow registration feeds four consumers.
 ///
-/// 🔑 **`upscale`, `upscaleQuality` and `upscaleGenerative` are three registrations behind ONE capability**, which
-/// is the engine's multi-package-per-`PackageID` pattern and the first place Forge uses it: Real-ESRGAN is the
-/// fast tier, SeedVR2-3B the quality tier, VOSR2 the generative stills tier (2026-09-26), and the planner
-/// picks. Adding SeedVR2 does **not** displace
+/// 🔑 **`upscale`, `upscaleFidelity`, `upscaleQuality` and `upscaleGenerative` are four registrations behind ONE
+/// capability**, which is the engine's multi-package-per-`PackageID` pattern and the first place Forge uses it:
+/// Real-ESRGAN is the fast tier, RealPLKSR the fidelity tier (2026-09-28), SeedVR2-3B the quality tier, VOSR2 the
+/// generative stills tier (2026-09-26), and the planner picks. Adding SeedVR2 does **not** displace
 /// Real-ESRGAN — `MODEL-CATALOG.md`'s standing rule is that when SeedVR2 isn't viable (memory, chip,
 /// file) `videoUpscale` routes to per-frame Real-ESRGAN: *same tool, lighter backer.*
 ///
@@ -78,6 +79,19 @@ public enum ForgeModel: String, CaseIterable, Sendable {
     // small text (AB-L-0172) — reach it through `EngineTextGuardedUpscaler`, whose routes stay opt-in per
     // measured tier pair; nothing routes to it by default. Weights: mlx-community/VOSR2-fp16 (int8 under budget).
     case upscaleGenerative // VOSR2 (fp16; int8 below 7 GB) — the generative stills tier, same capability
+    // ── upscaleFidelity (AB-T-0186 Step 1) ──
+    // Registered 2026-09-28. RealPLKSR `4x_webphoto_realplksr` (`mlx-realplksr-swift`): the first model whose
+    // weights are OURS end to end — trained by xocialize on the provenance-clean Commons-SR corpus, Apache-2.0,
+    // vendored in the package (no download). The FOURTH `imageUpscale` backer. It beat Real-ESRGAN at all 12
+    // degradation rungs including clean (AB-R-0285) and is the best non-generative arm on every damaged cell of the
+    // Forge bench (VOSR-EVAL §10), so it is routed by COST, not by degradation: the honest user control is
+    // "fast vs best", with Real-ESRGAN as fast. ~121–125 ms per Mpx of output on M5 Max, ~8× Real-ESRGAN (AB-R-0177).
+    // Named `upscaleFidelity`, not `upscaleWebPhoto`: AB-R-0285 measured it as a general quality tier, not a
+    // web-photo one, and `upscaleQuality` already means SeedVR2. "Fidelity" is what separates it from the two
+    // diffusion tiers: one deterministic feed-forward pass, gated on full-reference fidelity (PSNR/DISTS) — its GAN
+    // losses add texture, but nothing is sampled. ⚠️ Not a general-superiority claim — the hold-out was Commons
+    // content (AB-R-0285 ⚠️3); a third-party clean set is the missing measurement.
+    case upscaleFidelity   // RealPLKSR (fp32, vendored) — the fidelity tier, "best" beside Real-ESRGAN's "fast"
     case matte          // BiRefNet
     case colorize       // DDColor
     case inpaint        // LaMa / MI-GAN
@@ -124,6 +138,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .upscale:    return "Real-ESRGAN"
         case .upscaleQuality: return "SeedVR2-3B"
         case .upscaleGenerative: return "VOSR2"
+        case .upscaleFidelity: return "RealPLKSR"
         case .matte:      return "BiRefNet"
         case .colorize:   return "DDColor"
         case .inpaint:    return "LaMa / MI-GAN"
@@ -159,6 +174,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         // `videoTemporalTier` (the earlier "no app wires yet" note is retired).
         case .upscaleQuality: return .imageUpscale
         case .upscaleGenerative: return .imageUpscale
+        case .upscaleFidelity: return .imageUpscale
         case .matte:      return .matting
         case .colorize:   return .imageColorize
         case .inpaint:    return .imageInpaint
@@ -500,6 +516,19 @@ public final class ForgeEngineService {
                 id = try await engine.register(VOSRUpscalePackage.registration,
                                                configuration: VOSRConfiguration(quant: vosrQuant, defaultScale: 2),
                                                id: "vosr2-upscale")
+            case .upscaleFidelity:
+                // RealPLKSR (mlx-realplksr-swift 0.1.0). Package defaults on purpose (the BRIDGE-067 discipline): the
+                // one vendored checkpoint (`.webphoto`, 29.6 MB — `needsDownload` reads false, nothing materializes),
+                // whole-frame up to 1920×1080 INPUT pixels, 256/32 tiles above. Native ×4; a ×2 request is
+                // post-downsampled and `appliedScale` says so. ⚠️ The declared footprint was taken AT that whole-frame
+                // ceiling — PROVISIONAL 1.05 GB floor + 11.5 GB activation at 1080p ×4, derived from a 4.86 GB MLX
+                // peak, not measured in-app (REQUIREMENTS.md) — so admission charges the 1080p worst case for every
+                // input. Explicit id, equal to the manifest's surface name today: without one the engine keys by that
+                // name, so a second checkpoint registered from this package would silently replace this one — and only
+                // a live run shows it (AB-L-0160).
+                id = try await engine.register(RealPLKSRUpscalePackage.registration,
+                                               configuration: RealPLKSRConfiguration(),
+                                               id: "realplksr-webphoto-upscale")
             case .matte:
                 id = try await engine.register(BiRefNetPackage.registration,
                                                configuration: BiRefNetConfiguration())

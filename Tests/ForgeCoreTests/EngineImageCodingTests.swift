@@ -105,6 +105,7 @@ struct EngineImageCodingTests {
         #expect(ForgeModel.upscale.capability == .imageUpscale)
         #expect(ForgeModel.upscaleQuality.capability == .imageUpscale)
         #expect(ForgeModel.upscaleGenerative.capability == .imageUpscale)
+        #expect(ForgeModel.upscaleFidelity.capability == .imageUpscale)
         // The BRIDGE-066 wave: eight imageRestore backers total (NAFNet + wave + faces), one relight.
         let restoreBackers = models.filter { $0.capability == .imageRestore }
         #expect(restoreBackers.count == 9)

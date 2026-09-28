@@ -53,7 +53,9 @@ public struct ForgeCapabilities {
     /// paths — so this reports the *quality tier*, not the capability.
     public var qualityTierAvailability: [(capability: String, models: [ForgeModel], available: Bool)] {
         [
-            ("Optimize", [.restore, .upscale], isRegistered(.restore) && isRegistered(.upscale)),
+            // `.upscaleFidelity` (RealPLKSR) is listed as Optimize's "best" upscale tier, but availability stays keyed
+            // on `.upscale`: `enhancer` runs Real-ESRGAN only until the Kit's seam carries a fast-vs-best choice (AB-T-0187).
+            ("Optimize", [.restore, .upscale, .upscaleFidelity], isRegistered(.restore) && isRegistered(.upscale)),
             ("Extract",  [.matte, .promptMask, .promptMaskQuality, .flow], isRegistered(.matte)),
             ("Colorize", [.colorize, .flow], isRegistered(.colorize)),
             ("Erase",    [.inpaint, .promptMask, .promptMaskQuality, .flow], isRegistered(.inpaint)),
