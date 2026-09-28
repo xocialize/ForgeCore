@@ -60,11 +60,15 @@ let package = Package(
         // Category A Kit — RestoreTier2 is the provider-protocol seam this package implements
         // (BRIDGE-070). One-way: the Kit never depends back on ForgeCore.
         .package(url: "https://github.com/xocialize/ForgeRestoreKit.git", from: "0.10.0"),
-        .package(url: "https://github.com/xocialize/mlx-realesrgan-swift.git", from: "0.7.0"),
+        // The FAST stills tier behind `imageUpscale` — NERVE (AB-T-0186 Step 3, 2026-09-28): Phips/NERVE, Apache-2.0 code
+        // and weights trained only on a CC0 corpus (AB-D-0106), weights vendored in the package — no download. It
+        // REPLACED Real-ESRGAN as `.upscale`; `mlx-realesrgan-swift` stays in the graph through NERVE's own dependency on
+        // its shared tile driver, but ForgeCore no longer registers a Real-ESRGAN package.
+        .package(url: "https://github.com/xocialize/mlx-nerve-swift.git", from: "0.1.0"),
     // The quality tier behind `imageUpscale` — a second backer, not a replacement.
     .package(url: "https://github.com/xocialize/mlx-seedvr2-swift.git", from: "0.9.1"),
         // The GENERATIVE stills tier behind `imageUpscale` — VOSR2 (AB-T-0184/AB-T-0185): a third backer, beside
-        // Real-ESRGAN (fast) and SeedVR2 (quality/diffusion), never a replacement.
+        // the fast tier (Real-ESRGAN then, NERVE since 2026-09-28) and SeedVR2 (quality/diffusion), never a replacement.
         .package(url: "https://github.com/xocialize/mlx-vosr-swift.git", from: "0.1.0"),
         // The FIDELITY stills tier behind `imageUpscale` — RealPLKSR `4x_webphoto_realplksr` (AB-T-0186 Step 1): a fourth
         // backer, ours end to end (trained on the Commons-SR corpus, weights vendored in the package — no download).
@@ -117,7 +121,7 @@ let package = Package(
                 .product(name: "MLXRestoreFormer", package: "mlx-restoreformer-swift"),
                 .product(name: "MLXBOPBTL", package: "mlx-bopbtl-swift"),
                 .product(name: "RestoreTier2", package: "ForgeRestoreKit"),
-                .product(name: "MLXRealESRGAN", package: "mlx-realesrgan-swift"),
+                .product(name: "MLXNERVE", package: "mlx-nerve-swift"),
                 .product(name: "MLXSeedVR2", package: "mlx-seedvr2-swift"),
                 .product(name: "MLXVOSR", package: "mlx-vosr-swift"),
                 .product(name: "MLXRealPLKSR", package: "mlx-realplksr-swift"),
@@ -134,6 +138,9 @@ let package = Package(
         // ⚠️ Run with `swift test --build-system swiftbuild`. Importing MLX inherits the metallib
         // requirement, and the deprecated `native` build system ships no metallib — it aborts the whole
         // xctest process while the log still reads "all tests passed".
-        .testTarget(name: "ForgeCoreTests", dependencies: ["ForgeCore"]),
+        .testTarget(name: "ForgeCoreTests", dependencies: [
+            "ForgeCore",
+            .product(name: "MLXNERVE", package: "mlx-nerve-swift"),   // UpscaleTierTests pins the defaults ForgeCore registers
+        ]),
     ]
 )

@@ -20,7 +20,7 @@ import Foundation
 @MainActor
 public struct ForgeCapabilities {
 
-    /// Optimize — NAFNet restore → Real-ESRGAN upscale (`ForgeOptimizerKit.ImageEnhancer`).
+    /// Optimize — NAFNet restore → NERVE upscale (`ForgeOptimizerKit.ImageEnhancer`).
     public let enhancer: EngineImageEnhancer
     /// Extract quality tier — BiRefNet (`ExtractKit.MatteProvider`).
     public let matte: EngineMatteProvider
@@ -54,7 +54,7 @@ public struct ForgeCapabilities {
     public var qualityTierAvailability: [(capability: String, models: [ForgeModel], available: Bool)] {
         [
             // `.upscaleFidelity` (RealPLKSR) is listed as Optimize's "best" upscale tier, but availability stays keyed
-            // on `.upscale`: `enhancer` runs Real-ESRGAN only until the Kit's seam carries a fast-vs-best choice (AB-T-0187).
+            // on `.upscale`: `enhancer` runs the fast tier (NERVE) only until the Kit's seam carries a fast-vs-best choice (AB-T-0187).
             ("Optimize", [.restore, .upscale, .upscaleFidelity], isRegistered(.restore) && isRegistered(.upscale)),
             ("Extract",  [.matte, .promptMask, .promptMaskQuality, .flow], isRegistered(.matte)),
             ("Colorize", [.colorize, .flow], isRegistered(.colorize)),

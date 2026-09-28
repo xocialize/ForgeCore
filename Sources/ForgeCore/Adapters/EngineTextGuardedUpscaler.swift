@@ -72,8 +72,10 @@ public final class EngineTextGuardedUpscaler {
     /// at ×2 and ×4, VOSR-EVAL §11.2) or `.upscaleQuality` (SeedVR2-3B). The routes a tier pair earns are decided by
     /// `GuardedUpscaleLiveTests` + the OCR check, never assumed from another pair.
     public var generative: ForgeModel
-    /// The non-generative tier the protected words come from. Real-ESRGAN: feed-forward, deterministic —
-    /// "conservative non-generative restoration inside the mask" (the N7 rule).
+    /// The non-generative tier the protected words come from — the fast tier (`.upscale`: NERVE since 2026-09-28,
+    /// Real-ESRGAN in the 2026-09-26 route measurements above): feed-forward, deterministic — "conservative
+    /// non-generative restoration inside the mask" (the N7 rule). The routes were earned with Real-ESRGAN as the base;
+    /// re-run `GuardedUpscaleLiveTests` before trusting an opt-in route with the new base.
     public var base: ForgeModel
 
     public init(service: ForgeEngineService,

@@ -17,7 +17,8 @@
 //  flat or blown-out frame fails), and the output box-downsampled back onto the input grid agrees with the input at
 //  ≥ 25 dB luma PSNR — a fidelity tier's own promise, and a generous floor for garbage, not a quality score.
 //
-//  Real-ESRGAN runs the same inputs afterwards as the cost reference. Load and run are timed separately (see
+//  The fast tier (`.upscale` — Real-ESRGAN in the AB-R-0365 runs, NERVE since 2026-09-28) runs the same inputs
+//  afterwards as the cost reference. Load and run are timed separately (see
 //  `UpscaleDiagnostics`); `phys_footprint` is sampled after each run, and its peak is the PROCESS'S LIFETIME peak
 //  (monotonic), which is why the fidelity arm runs first. Outputs and a JSON receipt land in the out dir (default:
 //  the temp dir) — corpus media, never committed.

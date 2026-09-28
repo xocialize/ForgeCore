@@ -1,5 +1,5 @@
 {
-  "originHash" : "239afdecb8df66a8fc70f42e4b10b7cc7218e4ed53e12f7d1eb1775543f93e33",
+  "originHash" : "c50f9fb512b1417a926a8de320cbff5aaa9082cc14554d68682d456127f134a2",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -206,6 +206,15 @@
       "state" : {
         "revision" : "24975cf80d6785f36f0b46fe9e7f265119c8ce74",
         "version" : "0.4.0"
+      }
+    },
+    {
+      "identity" : "mlx-nerve-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/xocialize/mlx-nerve-swift.git",
+      "state" : {
+        "revision" : "bcfe71eba07dd25b4d29317471404858fb462488",
+        "version" : "0.1.0"
       }
     },
     {

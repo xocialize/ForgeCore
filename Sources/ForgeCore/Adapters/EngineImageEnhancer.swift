@@ -2,7 +2,8 @@
 //  EngineImageEnhancer.swift
 //  ForgeCore
 //
-//  ForgeOptimizerKit's `ImageEnhancer` seam, engine-backed: NAFNet restore → Real-ESRGAN upscale.
+//  ForgeOptimizerKit's `ImageEnhancer` seam, engine-backed: NAFNet restore → NERVE upscale (the fast tier; Real-ESRGAN
+//  until 2026-09-28).
 //  Both wrappers mirror `.rawBGRA8`, so the whole chain stays raw — no PNG hop between stages.
 //
 
@@ -18,12 +19,13 @@ public final class EngineImageEnhancer: ImageEnhancer {
 
     private let service: ForgeEngineService
 
-    /// The scale Real-ESRGAN actually applied on the most recent enhance, or nil if no upscale ran.
+    /// The scale the fast tier actually applied on the most recent enhance, or nil if no upscale ran.
     ///
-    /// The `general` variant is a fixed-4× model. Asking it for 2× used to yield 4× pixels while the
+    /// History: Real-ESRGAN's `general` was a fixed-4× model, and asking it for 2× used to yield 4× pixels while the
     /// recipe recorded "2×" — a product cannot offer an option that silently does something else.
-    /// `mlx-realesrgan-swift` 0.5.0 fixed the model side by post-downsampling to the requested scale;
-    /// this records what came back so the receipt describes the output rather than the request.
+    /// `mlx-realesrgan-swift` 0.5.0 fixed the model side by post-downsampling to the requested scale; NERVE runs ×2
+    /// natively and post-downsamples only ×1/×3. This records what came back so the receipt describes the output
+    /// rather than the request.
     public private(set) var lastAppliedScale: Int?
 
     public init(service: ForgeEngineService) {

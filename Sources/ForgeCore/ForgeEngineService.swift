@@ -27,7 +27,7 @@ import MLXCIDNet
 import MLXGFPGAN
 import MLXRestoreFormer
 import MLXBOPBTL
-import MLXRealESRGAN
+import MLXNERVE
 import MLXSeedVR2
 import MLXVOSR
 import MLXRealPLKSR
@@ -44,19 +44,22 @@ let log = Logger(subsystem: "com.xocialize.ForgeCore", category: "ForgeCore")
 
 /// 📄 **Machine requirements for every capability registered here: `REQUIREMENTS.md` at the package
 /// root** — footprints, backends, OS floors and the measured operating points, each citing a receipt.
-/// ⚠️ It opens with a live defect worth knowing before you size a machine: Real-ESRGAN's declared
-/// footprint (6.26 GB) is the *tiled* figure, while its default path is whole-frame and measures
-/// **21.24 GB at 1080p**. The governor admits against the declaration, not against reality.
+/// ⚠️ It opens with a defect CLASS worth knowing before you size a machine: a `QuantFootprint` is a scalar
+/// per quant, so a package whose default path scales with input can under-declare it. The recorded instance
+/// is Real-ESRGAN — declared 6.26 GB (the *tiled* figure) while its default whole-frame path measured
+/// **21.24 GB at 1080p**; the governor admits against the declaration, not against reality. Real-ESRGAN left
+/// the registered set on 2026-09-28 (NERVE, its replacement as `.upscale`, declares the max over a measured
+/// envelope that includes its whole-frame path); the class still applies to every input-dependent package.
 ///
 /// Every model package Forge registers. One case per registration, *not* per capability —
 /// Optimize alone uses two (restore + upscale), and one flow registration feeds four consumers.
 ///
 /// 🔑 **`upscale`, `upscaleFidelity`, `upscaleQuality` and `upscaleGenerative` are four registrations behind ONE
 /// capability**, which is the engine's multi-package-per-`PackageID` pattern and the first place Forge uses it:
-/// Real-ESRGAN is the fast tier, RealPLKSR the fidelity tier (2026-09-28), SeedVR2-3B the quality tier, VOSR2 the
-/// generative stills tier (2026-09-26), and the planner picks. Adding SeedVR2 does **not** displace
-/// Real-ESRGAN — `MODEL-CATALOG.md`'s standing rule is that when SeedVR2 isn't viable (memory, chip,
-/// file) `videoUpscale` routes to per-frame Real-ESRGAN: *same tool, lighter backer.*
+/// NERVE is the fast tier (2026-09-28, replacing Real-ESRGAN), RealPLKSR the fidelity tier (2026-09-28), SeedVR2-3B
+/// the quality tier, VOSR2 the generative stills tier (2026-09-26), and the planner picks. Adding SeedVR2 does **not**
+/// displace the fast tier — `MODEL-CATALOG.md`'s standing rule is that when SeedVR2 isn't viable (memory, chip,
+/// file) `videoUpscale` routes to the per-frame fast tier: *same tool, lighter backer.*
 ///
 /// 🚨 **`qualityScore` is not a transform — it is the second oracle, and it is here because its absence
 /// was a measurable defect.** `CLAUDE.md`'s standing rule is *two* oracles: SigLIP2 NR-IQA gates
@@ -68,7 +71,16 @@ let log = Logger(subsystem: "com.xocialize.ForgeCore", category: "ForgeCore")
 /// inverted. **The two oracles disagree by construction. Report both; never average them.**
 public enum ForgeModel: String, CaseIterable, Sendable {
     case restore        // NAFNet
-    case upscale        // Real-ESRGAN — the fast tier
+    // ── upscale (AB-T-0186 Step 3) ──
+    // Since 2026-09-28: NERVE (Phips/NERVE, `mlx-nerve-swift`) — the provenance-clean FAST tier, replacing Real-ESRGAN,
+    // whose DF2K-trained weights were the worst-provenanced tier Forge shipped (AB-L-0084). 1.8 M-param pure conv,
+    // Apache-2.0 code AND weights trained only on the CC0 LUCID corpus (platform-declared CC0, AB-D-0106), vendored —
+    // no download. Parity ≥ 138 dB vs the upstream PyTorch code and the author's ONNX; fp16 lane by default; ~21 ms per
+    // output Mpx on M5 Max (1.35–1.40× Real-ESRGAN, 0.16× RealPLKSR); native ×4 AND ×2, so HD → 4K never builds the 8K
+    // intermediate (AB-B-0013). On the Forge bench (NERVE-EVAL §5) `.fidelity` is the best full-reference arm on damaged
+    // photo, where Real-ESRGAN sat below bicubic. Real-ESRGAN's package stays available; ForgeCore registered only its
+    // `.general`, so no anime path is lost.
+    case upscale        // NERVE — the fast tier
     case upscaleQuality // SeedVR2-3B (int8) — the quality tier, same capability
     // ── upscaleGenerative (AB-T-0184 / AB-T-0185) ──
     // Registered 2026-09-26. VOSR2 (CSWRY/VOSR, CVPR 2026): a 1.4B one-step generative super-resolution DiT
@@ -85,13 +97,14 @@ public enum ForgeModel: String, CaseIterable, Sendable {
     // vendored in the package (no download). The FOURTH `imageUpscale` backer. It beat Real-ESRGAN at all 12
     // degradation rungs including clean (AB-R-0285) and is the best non-generative arm on every damaged cell of the
     // Forge bench (VOSR-EVAL §10), so it is routed by COST, not by degradation: the honest user control is
-    // "fast vs best", with Real-ESRGAN as fast. ~121–125 ms per Mpx of output on M5 Max, ~8× Real-ESRGAN (AB-R-0177).
+    // "fast vs best" (fast = Real-ESRGAN then, NERVE since 2026-09-28). ~111–125 ms per Mpx of output on M5 Max, ~8×
+    // Real-ESRGAN (AB-R-0177), ~6× NERVE (mlx-nerve-swift PORTING-SPEC N6).
     // Named `upscaleFidelity`, not `upscaleWebPhoto`: AB-R-0285 measured it as a general quality tier, not a
     // web-photo one, and `upscaleQuality` already means SeedVR2. "Fidelity" is what separates it from the two
     // diffusion tiers: one deterministic feed-forward pass, gated on full-reference fidelity (PSNR/DISTS) — its GAN
     // losses add texture, but nothing is sampled. ⚠️ Not a general-superiority claim — the hold-out was Commons
     // content (AB-R-0285 ⚠️3); a third-party clean set is the missing measurement.
-    case upscaleFidelity   // RealPLKSR (fp32, vendored) — the fidelity tier, "best" beside Real-ESRGAN's "fast"
+    case upscaleFidelity   // RealPLKSR (fp32, vendored) — the fidelity tier, "best" beside NERVE's "fast"
     case matte          // BiRefNet
     case colorize       // DDColor
     case inpaint        // LaMa / MI-GAN
@@ -135,7 +148,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
     public var modelName: String {
         switch self {
         case .restore:    return "NAFNet"
-        case .upscale:    return "Real-ESRGAN"
+        case .upscale:    return "NERVE"
         case .upscaleQuality: return "SeedVR2-3B"
         case .upscaleGenerative: return "VOSR2"
         case .upscaleFidelity: return "RealPLKSR"
@@ -452,19 +465,21 @@ public final class ForgeEngineService {
                 id = try await engine.register(NAFNetRestorePackage.registration,
                                                configuration: NAFNetConfiguration(variant: restoreVariant))
             case .upscale:
-                // ✅ **The A/B these knobs existed for is DONE and the package default moved to 128/8**
-                // (`mlx-realesrgan-swift` 0.7.0). t128 is 4.65× faster end to end at 8192² output and is
-                // the arm WITHOUT a detectable seam — t64 seams at z +1.50 against a null sweep, t128 at
-                // +0.46. `FORGE_RE_TILE` / `FORGE_RE_OVERLAP` stay for future geometry work; leaving both
-                // unset now takes the fast, clean path rather than the old 64.
-                // ⚠️ `tileOverlap` is ABSOLUTE (it covers the receptive field). Do NOT raise it to keep
-                // the old 1:8 ratio — that costs throughput and buys no margin.
-                let reEnv = ProcessInfo.processInfo.environment
-                id = try await engine.register(RealESRGANUpscalePackage.registration,
-                                               configuration: RealESRGANConfiguration(
-                                                   variant: .general,
-                                                   inputTileSize: reEnv["FORGE_RE_TILE"].flatMap(Int.init),
-                                                   tileOverlap: reEnv["FORGE_RE_OVERLAP"].flatMap(Int.init)))
+                // NERVE (mlx-nerve-swift ≥ 0.1.0) — the fast tier since 2026-09-28, replacing Real-ESRGAN (AB-T-0186
+                // Step 3). Package defaults on purpose (the BRIDGE-067 discipline): variant `.fidelity` — the plan's
+                // default until the NERVE/HEART crossover (AB-T-0190) reports, whose fixed rule then picks among
+                // `.fidelity`/`.clean`/`.sharp` —, the fp16 lane (70.5+ dB vs fp32, faster, half the peak), whole-frame
+                // up to 1920×1080 INPUT pixels, and above that 512 px tiles with a 56 px frame-cropped halo that
+                // reproduce the whole-frame output (NERVE's receptive field is 51 px; plain overlap tiles read 62.9 dB
+                // with the error in the seams). Native ×4 and ×2 (`.fidelity` ×2 → the native 2x_NERVE_OTF_gan
+                // checkpoint), ×1/×3 post-downsampled; `appliedScale` says what ran, which `EngineImageEnhancer` records.
+                // Declared split footprint is MEASURED over inputs up to 3840×2160 at ×4, the whole-frame path included
+                // (fp16 256 MB + 5.9 GB) — not Real-ESRGAN's tiled-only figure (REQUIREMENTS.md). Explicit id: without
+                // one the engine keys by the surface name, and a second NERVE registration would silently replace this
+                // one (AB-L-0160).
+                id = try await engine.register(NERVEUpscalePackage.registration,
+                                               configuration: NERVEConfiguration(),
+                                               id: "nerve-upscale")
             case .upscaleQuality:
                 // int8 is the validated default and **near-lossless** — the port measures it at ~50.3 dB
                 // / cos 0.9999 against fp16, at ~4.7 GB vs ~7.5 GB. (⚠️ An earlier version of this comment

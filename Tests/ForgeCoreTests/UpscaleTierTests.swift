@@ -1,13 +1,41 @@
 import Testing
 import MLXToolKit
+import MLXNERVE
 @testable import ForgeCore
 
 /// AB-T-0184/0185: VOSR2 joins Real-ESRGAN and SeedVR2-3B as the THIRD `imageUpscale` registration — the generative
 /// stills tier: its own `ForgeModel` case, its own display name, its own explicit PackageID (`vosr2-upscale`).
 /// AB-T-0186 Step 1: RealPLKSR (`4x_webphoto_realplksr`) is the FOURTH — the fidelity tier, the "best" beside
 /// Real-ESRGAN's "fast", explicit PackageID `realplksr-webphoto-upscale`.
+/// AB-T-0186 Step 3: NERVE REPLACES Real-ESRGAN as `.upscale`, the fast tier — explicit PackageID `nerve-upscale`.
 /// Pinned so the tiers never collapse onto one registration (the Restormer lesson, AB-L-0160).
 @Suite struct UpscaleTierTests {
+    @Test func fastTierIsNERVE() {
+        #expect(ForgeModel.upscale.capability == .imageUpscale)
+        #expect(ForgeModel.upscale.modelName == "NERVE")
+        let siblings: [ForgeModel] = [.upscaleFidelity, .upscaleQuality, .upscaleGenerative]
+        #expect(!siblings.map(\.modelName).contains(ForgeModel.upscale.modelName))
+    }
+
+    /// Registration is offline (vendored weights load on the first `run`): NERVE must clear `.permissiveOnly` +
+    /// `.blocking` (Apache-2.0 weights and port) and land on its explicit id, the one a UI binds and a receipt names.
+    @Test @MainActor func fastTierRegistersUnderItsExplicitID() async {
+        let service = ForgeEngineService()
+        await service.registerAll()
+        #expect(service.outcome(for: .upscale)?.failure == nil,
+                "NERVE did not register: \(service.outcome(for: .upscale)?.failure ?? "")")
+        #expect(service.packageID(for: .upscale)?.rawValue == "nerve-upscale")
+    }
+
+    /// ForgeCore registers the package defaults; these are the defaults it relies on — `.fidelity` (the plan's pick
+    /// until the crossover AB-T-0190 reports) on the fp16 lane, with a native ×2 route so HD → 4K never builds 8K.
+    @Test func fastTierDefaultsAreThePlansChoice() {
+        let c = NERVEConfiguration()
+        #expect(c.variant == .fidelity)
+        #expect(c.precision == .fp16)
+        #expect(c.variant.checkpoint2x != nil)
+    }
+
     @Test func generativeTierIsAThirdImageUpscaleRegistration() {
         #expect(ForgeModel.upscaleGenerative.capability == .imageUpscale)
         #expect(ForgeModel.upscaleGenerative.modelName == "VOSR2")
