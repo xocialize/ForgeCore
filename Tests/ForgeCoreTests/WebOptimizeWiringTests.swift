@@ -26,7 +26,13 @@ import UniformTypeIdentifiers
 @MainActor
 struct WebOptimizeWiringTests {
 
-    /// JPEG in → PNG out through `ForgeCapabilities`' own provider instances.
+    /// TIFF in → a web deliverable out, through `ForgeCapabilities`' own provider instances.
+    ///
+    /// ⚠️ The source was a JPEG until 2026-09-29, and that went stale the same way the PNG assertion below did: the
+    /// Kit's web verb keeps a web-native source (PNG / JPEG / WebP) whose re-encode is not smaller — the honest skip,
+    /// correct behaviour — and this 96² q0.6 JPEG re-encodes larger (6,265 B vs 4,027 B). ForgeCore's own resolve sat
+    /// at Kit 0.11.0, which predates that gate, so CI never saw it; resolving the current Kit (0.19.0, for the upscale
+    /// tier seam) did. A TIFF is never web-native, so the verb must convert it, and the wiring gets exercised.
     @Test func providersDriveWebOptimizeEndToEnd() async throws {
         let service = ForgeEngineService()
         let caps = ForgeCapabilities(service: service)
@@ -36,8 +42,8 @@ struct WebOptimizeWiringTests {
             .appendingPathComponent("forgecore-web-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tmp) }
-        let src = tmp.appendingPathComponent("input.jpg")
-        try Self.writeJPEG(Self.makeTexturedImage(96, 96), to: src)
+        let src = tmp.appendingPathComponent("input.tiff")
+        try Self.writeTIFF(Self.makeTexturedImage(96, 96), to: src)
 
         var results: [OptimizeResult] = []
         for await r in try forge.webOptimize(.url(src), to: .directory(tmp.appendingPathComponent("o"))) {
@@ -96,8 +102,8 @@ struct WebOptimizeWiringTests {
 
     // MARK: - Fixtures
 
-    /// Gradient + deterministic texture (the Kit's own fixture recipe) — detailed enough that the
-    /// JPEG is a genuinely lossy source, so the measured score is a real round-trip claim.
+    /// Gradient + deterministic texture (the Kit's own fixture recipe) — detailed enough that a lossy
+    /// candidate has real work to do, so the measured score is a real round-trip claim.
     private static func makeTexturedImage(_ w: Int, _ h: Int) -> CGImage {
         var bytes = [UInt8](repeating: 0, count: w * h * 4)
         for y in 0..<h { for x in 0..<w {
@@ -115,12 +121,11 @@ struct WebOptimizeWiringTests {
         return ctx.makeImage()!
     }
 
-    private static func writeJPEG(_ image: CGImage, to url: URL) throws {
+    private static func writeTIFF(_ image: CGImage, to url: URL) throws {
         struct FixtureError: Error {}
         guard let dst = CGImageDestinationCreateWithURL(
-            url as CFURL, UTType.jpeg.identifier as CFString, 1, nil) else { throw FixtureError() }
-        CGImageDestinationAddImage(dst, image, [
-            kCGImageDestinationLossyCompressionQuality: 0.6] as CFDictionary)
+            url as CFURL, UTType.tiff.identifier as CFString, 1, nil) else { throw FixtureError() }
+        CGImageDestinationAddImage(dst, image, nil)
         guard CGImageDestinationFinalize(dst) else { throw FixtureError() }
     }
 }

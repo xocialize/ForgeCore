@@ -26,13 +26,14 @@ let package = Package(
     ],
     dependencies: [
         // A — net-clean Kits owning the provider protocols these adapters implement.
-        // 0.11.0 = the first tag carrying the §6.3 planner-hint seam (`ContentHintProvider` /
-        // `ContentHint` / `HintedStartPolicy`), which `EngineContentHintProvider` implements. It
-        // supersedes the old 0.5.0 floor (`webOptimize`); that verb is still in the surface, a
-        // higher floor being the stronger guarantee. ⚠️ URL-at-a-tag, never a path — mixing the two
-        // for one package identity jams the whole graph at the lowest pin any consumer holds
-        // (`Docs/LESSONS.md` "SPM gotcha", 2026-06-24).
-        .package(url: "https://github.com/xocialize/ForgeOptimizerKit.git", from: "0.11.0"),
+        // 0.19.0 = the first tag carrying the upscale-tier seam (`Options.upscaleTier`, `EnhanceOutcome`,
+        // `ImageEnhancer.availability(of:)`), which `EngineImageEnhancer` implements (AB-T-0187). It
+        // supersedes the 0.11.0 floor (the §6.3 planner-hint seam `EngineContentHintProvider` implements)
+        // and the 0.5.0 one (`webOptimize`); both are still in the surface, a higher floor being the
+        // stronger guarantee. ⚠️ URL-at-a-tag, never a path — mixing the two for one package identity
+        // jams the whole graph at the lowest pin any consumer holds (`Docs/LESSONS.md` "SPM gotcha",
+        // 2026-06-24).
+        .package(url: "https://github.com/xocialize/ForgeOptimizerKit.git", from: "0.19.0"),
         .package(url: "https://github.com/xocialize/ExtractKit.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/ColorizeKit.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/EraseKit.git", from: "0.2.0"),

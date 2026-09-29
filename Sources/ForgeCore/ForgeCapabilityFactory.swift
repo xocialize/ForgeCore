@@ -20,7 +20,8 @@ import Foundation
 @MainActor
 public struct ForgeCapabilities {
 
-    /// Optimize — NAFNet restore → NERVE upscale (`ForgeOptimizerKit.ImageEnhancer`).
+    /// Optimize — NAFNet restore → NERVE (`.fast`) or RealPLKSR (`.best`) upscale (`ForgeOptimizerKit.ImageEnhancer`).
+    /// Ask it `availability(of:)` to know whether a tier can run here, and why not.
     public let enhancer: EngineImageEnhancer
     /// Extract quality tier — BiRefNet (`ExtractKit.MatteProvider`).
     public let matte: EngineMatteProvider
@@ -53,8 +54,9 @@ public struct ForgeCapabilities {
     /// paths — so this reports the *quality tier*, not the capability.
     public var qualityTierAvailability: [(capability: String, models: [ForgeModel], available: Bool)] {
         [
-            // `.upscaleFidelity` (RealPLKSR) is listed as Optimize's "best" upscale tier, but availability stays keyed
-            // on `.upscale`: `enhancer` runs the fast tier (NERVE) only until the Kit's seam carries a fast-vs-best choice (AB-T-0187).
+            // `.upscaleFidelity` (RealPLKSR) is Optimize's "best" upscale tier (`Options.upscaleTier`, AB-T-0187), but
+            // availability stays keyed on the fast tier: Optimize runs without Best, and whether Best can run HERE is a
+            // per-tier answer with a reason — `enhancer.availability(of: .best)` — not a capability-wide boolean.
             ("Optimize", [.restore, .upscale, .upscaleFidelity], isRegistered(.restore) && isRegistered(.upscale)),
             ("Extract",  [.matte, .promptMask, .promptMaskQuality, .flow], isRegistered(.matte)),
             ("Colorize", [.colorize, .flow], isRegistered(.colorize)),

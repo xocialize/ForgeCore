@@ -110,7 +110,7 @@ error deep inside that package instead of at the boundary.
 
 | Wrapper | Mirrors `.rawBGRA8` |
 |---|---|
-| `mlx-nafnet-swift`, `mlx-realesrgan-swift` | ✅ — Optimize runs raw end to end |
+| `mlx-nafnet-swift`, `mlx-nerve-swift`, `mlx-realplksr-swift` | ✅ — Optimize runs raw end to end |
 | BiRefNet, DDColor, LaMa, SEA-RAFT, EdgeTAM | ❌ — PNG leg (tracked as BRIDGE-041) |
 
 `Matte` is PNG-only by contract regardless.

@@ -332,6 +332,10 @@ public final class ForgeEngineService {
 
     private var packageIDs: [ForgeModel: PackageID] = [:]
 
+    /// The configuration each model was registered with — kept so `admissibility(for:)` evaluates exactly
+    /// the variant the engine will load, not a re-constructed default that could drift from it.
+    private var configurations: [ForgeModel: any PackageConfiguration] = [:]
+
     /// Which NAFNet checkpoint backs `imageRestore`. **Default `.signage`, by measurement.**
     ///
     /// ⚠️ **The variant names mislead.** `.signage` is not signage-specific — it is a width-24
@@ -479,8 +483,8 @@ public final class ForgeEngineService {
             let id: PackageID
             switch model {
             case .restore:
-                id = try await engine.register(NAFNetRestorePackage.registration,
-                                               configuration: NAFNetConfiguration(variant: restoreVariant))
+                id = try await registerRecording(model, NAFNetRestorePackage.registration,
+                                                        configuration: NAFNetConfiguration(variant: restoreVariant))
             case .upscale:
                 // NERVE (mlx-nerve-swift ≥ 0.1.0) — the fast tier since 2026-09-28, replacing Real-ESRGAN (AB-T-0186
                 // Step 3). Package defaults on purpose (the BRIDGE-067 discipline): variant `.fidelity` — KEPT after
@@ -495,9 +499,9 @@ public final class ForgeEngineService {
                 // (fp16 256 MB + 5.9 GB) — not Real-ESRGAN's tiled-only figure (REQUIREMENTS.md). Explicit id: without
                 // one the engine keys by the surface name, and a second NERVE registration would silently replace this
                 // one (AB-L-0160).
-                id = try await engine.register(NERVEUpscalePackage.registration,
-                                               configuration: NERVEConfiguration(),
-                                               id: "nerve-upscale")
+                id = try await registerRecording(model, NERVEUpscalePackage.registration,
+                                                        configuration: NERVEConfiguration(),
+                                                        id: "nerve-upscale")
             case .upscaleQuality:
                 // int8 is the validated default and **near-lossless** — the port measures it at ~50.3 dB
                 // / cos 0.9999 against fp16, at ~4.7 GB vs ~7.5 GB. (⚠️ An earlier version of this comment
@@ -523,15 +527,15 @@ public final class ForgeEngineService {
                 // pending the halo sweep's verdict.
                 let halo = env["FORGE_SEEDVR2_HALO"].flatMap(Int.init) ?? 0
                 let wholeFrame = env["FORGE_SEEDVR2_WHOLEFRAME"].flatMap(Int.init) ?? (1024 * 1024)
-                id = try await engine.register(SeedVR2UpscalePackage.registration,
-                                               configuration: SeedVR2Configuration(
-                                                   quant: .int8,
-                                                   temporalWindow: videoTemporalTier.temporalWindow,
-                                                   tileSize: tile,
-                                                   tileOverlap: overlap,
-                                                   tileHalo: halo,
-                                                   imageWholeFramePixels: wholeFrame,
-                                                   bankResidencyBudgetBytes: bankResidencyBudgetBytes))
+                id = try await registerRecording(model, SeedVR2UpscalePackage.registration,
+                                                        configuration: SeedVR2Configuration(
+                                                            quant: .int8,
+                                                            temporalWindow: videoTemporalTier.temporalWindow,
+                                                            tileSize: tile,
+                                                            tileOverlap: overlap,
+                                                            tileHalo: halo,
+                                                            imageWholeFramePixels: wholeFrame,
+                                                            bankResidencyBudgetBytes: bankResidencyBudgetBytes))
             case .upscaleGenerative:
                 // VOSR2 (mlx-vosr-swift 0.1.0): fp16 is the default lane (49.3 dB vs the fp32 oracle); the package
                 // itself drops to its int8 DiT (46.7 dB) when the governor stamps less than 7 GB of headroom
@@ -546,9 +550,9 @@ public final class ForgeEngineService {
                     default: return .fp16
                     }
                 }()
-                id = try await engine.register(VOSRUpscalePackage.registration,
-                                               configuration: VOSRConfiguration(quant: vosrQuant, defaultScale: 2),
-                                               id: "vosr2-upscale")
+                id = try await registerRecording(model, VOSRUpscalePackage.registration,
+                                                        configuration: VOSRConfiguration(quant: vosrQuant, defaultScale: 2),
+                                                        id: "vosr2-upscale")
             case .upscaleFidelity:
                 // RealPLKSR (mlx-realplksr-swift 0.1.0). Package defaults on purpose (the BRIDGE-067 discipline): the
                 // one vendored checkpoint (`.webphoto`, 29.6 MB — `needsDownload` reads false, nothing materializes),
@@ -559,9 +563,9 @@ public final class ForgeEngineService {
                 // input. Explicit id, equal to the manifest's surface name today: without one the engine keys by that
                 // name, so a second checkpoint registered from this package would silently replace this one — and only
                 // a live run shows it (AB-L-0160).
-                id = try await engine.register(RealPLKSRUpscalePackage.registration,
-                                               configuration: RealPLKSRConfiguration(),
-                                               id: "realplksr-webphoto-upscale")
+                id = try await registerRecording(model, RealPLKSRUpscalePackage.registration,
+                                                        configuration: RealPLKSRConfiguration(),
+                                                        id: "realplksr-webphoto-upscale")
             case .upscaleHEART:
                 // HEART (mlx-heart-swift 0.1.0). Package defaults on purpose (the BRIDGE-067 discipline): variant
                 // `.fidelity` (heart_4x_otf_v2), the fp16 lane (every reduction held at fp32 inside; the package's
@@ -573,15 +577,15 @@ public final class ForgeEngineService {
                 // + config.json, 34 MB) into its store on first prepare. Declared footprint fp16 1.06 GB + 7.6 GB on the
                 // in-app basis, PROVISIONAL (derived through the tile-driver sibling's measured ratios from a 3.18 GB
                 // MLX peak; REQUIREMENTS.md). Explicit id (AB-L-0160).
-                id = try await engine.register(HEARTUpscalePackage.registration,
-                                               configuration: HEARTConfiguration(),
-                                               id: "heart-upscale")
+                id = try await registerRecording(model, HEARTUpscalePackage.registration,
+                                                        configuration: HEARTConfiguration(),
+                                                        id: "heart-upscale")
             case .matte:
-                id = try await engine.register(BiRefNetPackage.registration,
-                                               configuration: BiRefNetConfiguration())
+                id = try await registerRecording(model, BiRefNetPackage.registration,
+                                                        configuration: BiRefNetConfiguration())
             case .deblurMotion:
-                id = try await engine.register(FFTformerRestorePackage.registration,
-                                               configuration: FFTformerConfiguration())
+                id = try await registerRecording(model, FFTformerRestorePackage.registration,
+                                                        configuration: FFTformerConfiguration())
             // Restormer: ONE package, THREE registrations — the variant is a Configuration knob, so
             // each behaviour needs its own PackageID to be individually reachable/preparable
             // (BRIDGE-066 asked that the mechanism be recorded: it is per-registration config,
@@ -592,57 +596,57 @@ public final class ForgeEngineService {
             // for motion and defocus too, under their names. `upscale`/`upscaleQuality` never hit this
             // because they are different packages. Pinned by `RegistrationIdentityTests`.
             case .restormerMotion:
-                id = try await engine.register(RestormerRestorePackage.registration,
-                                               configuration: RestormerConfiguration(variant: .motionDeblur),
-                                               id: "restormer-motion-deblur")
+                id = try await registerRecording(model, RestormerRestorePackage.registration,
+                                                        configuration: RestormerConfiguration(variant: .motionDeblur),
+                                                        id: "restormer-motion-deblur")
             case .restormerDefocus:
-                id = try await engine.register(RestormerRestorePackage.registration,
-                                               configuration: RestormerConfiguration(variant: .defocusDeblur),
-                                               id: "restormer-defocus-deblur")
+                id = try await registerRecording(model, RestormerRestorePackage.registration,
+                                                        configuration: RestormerConfiguration(variant: .defocusDeblur),
+                                                        id: "restormer-defocus-deblur")
             case .restormerDenoise:
-                id = try await engine.register(RestormerRestorePackage.registration,
-                                               configuration: RestormerConfiguration(variant: .realDenoise),
-                                               id: "restormer-real-denoise")
+                id = try await registerRecording(model, RestormerRestorePackage.registration,
+                                                        configuration: RestormerConfiguration(variant: .realDenoise),
+                                                        id: "restormer-real-denoise")
             case .denoiseStrength:
-                id = try await engine.register(DRUNetRestorePackage.registration,
-                                               configuration: DRUNetConfiguration())
+                id = try await registerRecording(model, DRUNetRestorePackage.registration,
+                                                        configuration: DRUNetConfiguration())
             case .denoiseBlind:
                 // .realPSNR only — V4 measured the GAN variant 0.9–1.5 dB behind and a no-op at
                 // ISO1600. It stays selectable via configuration if a perceptual surface ever wants
                 // it; it does not get a registration until something measures a use for one.
-                id = try await engine.register(SCUNetRestorePackage.registration,
-                                               configuration: SCUNetConfiguration(variant: .realPSNR))
+                id = try await registerRecording(model, SCUNetRestorePackage.registration,
+                                                        configuration: SCUNetConfiguration(variant: .realPSNR))
             case .relight:
                 // Package defaults on purpose (BRIDGE-067: "take the package's default variant; do
                 // not choose one in ForgeCore"). The luma gate lives in-package — a correctly-dark
                 // input coming back unmodified is the CONTRACT, not a failure.
-                id = try await engine.register(CIDNetRelightPackage.registration,
-                                               configuration: CIDNetConfiguration())
+                id = try await registerRecording(model, CIDNetRelightPackage.registration,
+                                                        configuration: CIDNetConfiguration())
             case .faceRestore:
-                id = try await engine.register(GFPGANRestorePackage.registration,
-                                               configuration: GFPGANConfiguration())
+                id = try await registerRecording(model, GFPGANRestorePackage.registration,
+                                                        configuration: GFPGANConfiguration())
             case .faceRestoreVQ:
-                id = try await engine.register(RestoreFormerRestorePackage.registration,
-                                               configuration: RestoreFormerConfiguration())
+                id = try await registerRecording(model, RestoreFormerRestorePackage.registration,
+                                                        configuration: RestoreFormerConfiguration())
             case .defectDetect:
                 // The detection half of automatic damage repair — its mask feeds the registered
                 // `.inpaint`. ⚠️ Corpus validation on real scratched photographs is deliberately
                 // deferred to the app/restore-scaffolding stage (P7 row); upstream synthetic
                 // behaviour: 100% recall / 65.7% precision / zero false pixels on a clean control.
-                id = try await engine.register(BOPBTLDetectPackage.registration,
-                                               configuration: BOPBTLConfiguration())
+                id = try await registerRecording(model, BOPBTLDetectPackage.registration,
+                                                        configuration: BOPBTLConfiguration())
             case .colorize:
-                id = try await engine.register(DDColorPackage.registration,
-                                               configuration: DDColorConfiguration())
+                id = try await registerRecording(model, DDColorPackage.registration,
+                                                        configuration: DDColorConfiguration())
             case .inpaint:
-                id = try await engine.register(InpaintPackage.registration,
-                                               configuration: InpaintConfiguration())
+                id = try await registerRecording(model, InpaintPackage.registration,
+                                                        configuration: InpaintConfiguration())
             case .flow:
-                id = try await engine.register(SEARAFTOpticalFlowPackage.registration,
-                                               configuration: SEARAFTConfiguration(variant: .spring, iters: 4))
+                id = try await registerRecording(model, SEARAFTOpticalFlowPackage.registration,
+                                                        configuration: SEARAFTConfiguration(variant: .spring, iters: 4))
             case .promptMask:
-                id = try await engine.register(EdgeTAMPackage.registration,
-                                               configuration: EdgeTAMConfiguration())
+                id = try await registerRecording(model, EdgeTAMPackage.registration,
+                                                        configuration: EdgeTAMConfiguration())
             case .promptMaskQuality:
                 // SAM 2.1-Small (mlx-edgetam-swift 0.6.0, AB-T-0173): the Quick Select QUALITY tier — a belly
                 // click selects the whole fox (IoU 0.968 vs EdgeTAM 0.008) and a click on one gate square selects
@@ -651,9 +655,9 @@ public final class ForgeEngineService {
                 // `model:`. Declared split 0.25 GB resident + 2.6 GB activation (measured phys 2.35 GB at 1024²).
                 // Explicit id: two packages, two PackageIDs — never keyed by a manifest surface name that a
                 // sibling might share (the Restormer lesson, AB-L-0160).
-                id = try await engine.register(SAM21Package.registration,
-                                               configuration: SAM21Configuration(),
-                                               id: "sam21-prompt-segment")
+                id = try await registerRecording(model, SAM21Package.registration,
+                                                        configuration: SAM21Configuration(),
+                                                        id: "sam21-prompt-segment")
             case .frameInterpolate:
                 // Package defaults on purpose (the BRIDGE-067 discipline): factor 2, and the tiling
                 // geometry (whole-frame ≤ 1080p, tile 1024 / overlap 128 above) is the package's own
@@ -662,16 +666,16 @@ public final class ForgeEngineService {
                 // default is load-bearing: hardware VideoToolbox HEVC right after heavy Metal compute
                 // stalls — and on quarantined builds (AB-B-0002, 26A5406e) panics the machine on
                 // teardown. No Forge surface may set FRAMESTREAM_ENCODE=hardware.
-                id = try await engine.register(RIFEInterpolatePackage.registration,
-                                               configuration: RIFEConfiguration())
+                id = try await registerRecording(model, RIFEInterpolatePackage.registration,
+                                                        configuration: RIFEConfiguration())
             case .contentClassify:
                 // Package defaults on purpose (the BRIDGE-067 discipline): the repo, the 16-frame
                 // uniform sampling and the 256² preprocessing are the port's parity-locked pipeline,
                 // not ForgeCore's to second-guess. `topK` is left at 5 even though the planner reads
                 // only the embedding — the tags cost nothing and travel into receipts verbatim as
                 // provenance for the calibration rows.
-                id = try await engine.register(VJEPA2ContentClassifyPackage.registration,
-                                               configuration: VJEPA2Configuration())
+                id = try await registerRecording(model, VJEPA2ContentClassifyPackage.registration,
+                                                        configuration: VJEPA2Configuration())
             case .qualityScore:
                 // `maxPatches` is a coverage/cost knob, not a quality knob: the scorer mean-pools up to
                 // N native-scale 224² patches. ⚠️ **The default 8 is too few for a 2048² frame** — 8
@@ -681,14 +685,23 @@ public final class ForgeEngineService {
                 // silently looked at 10% of the picture would be exactly the kind of plausible wrong
                 // number V10 exists to catch.
                 let patches = ProcessInfo.processInfo.environment["FORGE_IQA_PATCHES"].flatMap(Int.init) ?? 32
-                id = try await engine.register(SigLIP2IQAPackage.registration,
-                                               configuration: SigLIP2IQAConfiguration(maxPatches: patches))
+                id = try await registerRecording(model, SigLIP2IQAPackage.registration,
+                                                        configuration: SigLIP2IQAConfiguration(maxPatches: patches))
             }
             packageIDs[model] = id
             return RegistrationOutcome(model: model, packageID: id, failure: nil)
         } catch {
             return RegistrationOutcome(model: model, packageID: nil, failure: Self.describe(error))
         }
+    }
+
+    /// `engine.register`, remembering the configuration for `admissibility(for:)`.
+    private func registerRecording(_ model: ForgeModel, _ registration: PackageRegistration,
+                                   configuration: any PackageConfiguration,
+                                   id: PackageID? = nil) async throws -> PackageID {
+        let packageID = try await engine.register(registration, configuration: configuration, id: id)
+        configurations[model] = configuration
+        return packageID
     }
 
     /// Name *why* a registration failed, in the user's terms. `EngineError`'s payloads carry the detail
@@ -720,5 +733,23 @@ public final class ForgeEngineService {
 
     public func outcome(for model: ForgeModel) -> RegistrationOutcome? {
         outcomes.first { $0.model == model }
+    }
+
+    /// The engine's admission verdict for `model` exactly as registered — device eligibility, and whether
+    /// its declared working set can fit the memory budget at all (`fitsBudget`: after evicting every idle
+    /// resident) — computed without loading anything. nil when the model did not register.
+    ///
+    /// ⚠️ It is the governor's own arithmetic over the package's DECLARED footprint, so it is exactly as
+    /// honest as that declaration: a provisional figure above the real peak refuses a run that would have
+    /// fit. That is why declarations get re-baselined in-app (AB-T-0019).
+    public func admissibility(for model: ForgeModel) async -> Admissibility? {
+        guard let id = packageIDs[model], let configuration = configurations[model],
+              let manifest = await engine.manifest(for: id) else { return nil }
+        return await engine.admissibility(for: manifest.requirements, configuration: configuration)
+    }
+
+    /// The engine's memory budget on this Mac — what `admissibility(for:)` measures against.
+    public var memoryBudgetBytes: UInt64 {
+        get async { await engine.memory.budgetBytes }
     }
 }
