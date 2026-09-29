@@ -68,6 +68,9 @@ import UniformTypeIdentifiers
                          "\(arm.modelName) must register: \(service.outcome(for: arm)?.failure ?? "no failure recorded")")
         }
         print("e2e: arms \(arms.map { "\($0.modelName) [\(service.packageID(for: $0)!.rawValue)]" })")
+        // Whether the engine's MLX buffer-pool cap is in force in THIS process — the variable that separates a
+        // package's working set from a retained pool when two processes disagree about the same run (AB-T-0019).
+        print("e2e: MLX pool cap applied by the engine: \(service.engine.appliedGPUCacheLimitBytes.map { String(format: "%.2f GB", Double($0) / 1e9) } ?? "none")")
 
         var receipts: [[String: Any]] = []
         for arm in arms {
@@ -76,6 +79,7 @@ import UniformTypeIdentifiers
                 let image = try #require(Self.loadImage(url), "could not decode \(url.path)")
                 let m = try await service.measureUpscale(image, model: arm, scale: 4)
                 let foot = Self.physFootprint()
+                let pool = service.engine.gpuPoolSnapshot()
 
                 #expect(m.outputWidth == image.width * 4 && m.outputHeight == image.height * 4,
                         "\(arm.modelName) \(name): \(m.outputWidth)×\(m.outputHeight) for ×4 of \(image.width)×\(image.height)")
@@ -107,12 +111,17 @@ import UniformTypeIdentifiers
                     "inputChannelMeans": inStats.channelMeans, "outputChannelMeans": outStats.channelMeans,
                     "downsampleConsistencyDB": consistency,
                     "physFootprintBytes": foot?.current ?? 0, "physFootprintLifetimePeakBytes": foot?.peak ?? 0,
+                    "mlxPoolActiveBytes": pool?.activeBytes ?? 0, "mlxPoolCacheBytes": pool?.cacheBytes ?? 0,
+                    "mlxPoolPeakBytes": pool?.peakBytes ?? 0, "mlxPoolCapBytes": pool?.cacheLimitBytes ?? 0,
                 ])
                 print(String(format: "e2e: %@ %@ %d×%d → %d×%d ×%d  load %.2f s  run %.2f s (%.0f ms/Mpx out)  luma %.1f→%.1f σ %.1f→%.1f  consistency %.1f dB  phys %.2f GB (lifetime peak %.2f GB)",
                              arm.modelName, name, image.width, image.height, m.outputWidth, m.outputHeight, m.appliedScale,
                              m.loadSeconds, m.runSeconds, m.runSeconds * 1000 / mpx,
                              inStats.lumaMean, outStats.lumaMean, inStats.lumaStd, outStats.lumaStd, consistency,
                              Double(foot?.current ?? 0) / 1e9, Double(foot?.peak ?? 0) / 1e9))
+                print(String(format: "e2e:   MLX pool after the run: active %.2f GB · cache %.2f GB · peak %.2f GB · cap %.2f GB",
+                             Double(pool?.activeBytes ?? 0) / 1e9, Double(pool?.cacheBytes ?? 0) / 1e9,
+                             Double(pool?.peakBytes ?? 0) / 1e9, Double(pool?.cacheLimitBytes ?? 0) / 1e9))
             }
         }
         let json = try JSONSerialization.data(withJSONObject: receipts, options: [.prettyPrinted, .sortedKeys])

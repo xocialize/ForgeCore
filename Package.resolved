@@ -1,5 +1,5 @@
 {
-  "originHash" : "4a00f47c07458676135a59c967c3e34e8152e2cc516356c44a8258185c8ad75b",
+  "originHash" : "125fc46fa454e44250e837707de95af355f717cc5afe3e7448ff12dffe644e1f",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -249,8 +249,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-realplksr-swift.git",
       "state" : {
-        "revision" : "e397a24c17ec50f60ea041a7febd5a2530262fb5",
-        "version" : "0.1.0"
+        "revision" : "b9a2ec0e8fd96189455d01537ca39d3799b047a5",
+        "version" : "0.1.1"
       }
     },
     {

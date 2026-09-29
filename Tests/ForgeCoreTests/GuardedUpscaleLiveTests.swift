@@ -16,7 +16,9 @@
 //  tiers and produced a mask. Every output and a JSON receipt land in FORGE_GUARD_E2E_OUT for the OCR check
 //  outside (`Tools/vosr-gates/scripts/guard_e2e_score.py`), which is what decides whether a route earns its opt-in
 //  for a tier pair: 2026-09-26, SeedVR2-3B ×2, VOSR2 ×2, VOSR2 ×4 and SeedVR2-3B ×4, each with Real-ESRGAN as the
-//  base, three ScreenSR pages — the generative route read best on every page in every run (VOSR-EVAL §11.1–§11.2).
+//  base, three ScreenSR pages — the generative route read best on every page in every run (VOSR-EVAL §11.1–§11.2);
+//  2026-09-29, VOSR2 ×2 and ×4 with NERVE as the base — best in 5 of 6 cells, the sixth a 0.010 edge on the sparse
+//  page (§11.3). No opt-in route has been earned by any pair.
 //
 
 import Testing
@@ -50,10 +52,10 @@ import MaskKit
         if FileManager.default.fileExists(atPath: store.path) { await service.attachModelStore(root: store) }
         await service.registerAll()
         try #require(service.packageID(for: .upscale) != nil,
-                     "Real-ESRGAN must register: \(service.outcome(for: .upscale)?.failure ?? "no failure recorded")")
+                     "\(ForgeModel.upscale.modelName) (the base tier) must register: \(service.outcome(for: .upscale)?.failure ?? "no failure recorded")")
         try #require(service.packageID(for: generative) != nil,
                      "\(generative.modelName) must register: \(service.outcome(for: generative)?.failure ?? "no failure recorded")")
-        print("e2e: generative tier \(generative.modelName) (\(generative.rawValue)), base Real-ESRGAN, scale ×\(scale)")
+        print("e2e: generative tier \(generative.modelName) (\(generative.rawValue)), base \(ForgeModel.upscale.modelName), scale ×\(scale)")
 
         let files = try FileManager.default.contentsOfDirectory(at: inDir, includingPropertiesForKeys: nil)
             .filter { $0.pathExtension.lowercased() == "png" }

@@ -554,15 +554,15 @@ public final class ForgeEngineService {
                                                         configuration: VOSRConfiguration(quant: vosrQuant, defaultScale: 2),
                                                         id: "vosr2-upscale")
             case .upscaleFidelity:
-                // RealPLKSR (mlx-realplksr-swift 0.1.0). Package defaults on purpose (the BRIDGE-067 discipline): the
+                // RealPLKSR (mlx-realplksr-swift ≥ 0.1.1). Package defaults on purpose (the BRIDGE-067 discipline): the
                 // one vendored checkpoint (`.webphoto`, 29.6 MB — `needsDownload` reads false, nothing materializes),
                 // whole-frame up to 1920×1080 INPUT pixels, 256/32 tiles above. Native ×4; a ×2 request is
-                // post-downsampled and `appliedScale` says so. ⚠️ The declared footprint was taken AT that whole-frame
-                // ceiling — PROVISIONAL 1.05 GB floor + 11.5 GB activation at 1080p ×4, derived from a 4.86 GB MLX
-                // peak, not measured in-app (REQUIREMENTS.md) — so admission charges the 1080p worst case for every
-                // input. Explicit id, equal to the manifest's surface name today: without one the engine keys by that
-                // name, so a second checkpoint registered from this package would silently replace this one — and only
-                // a live run shows it (AB-L-0160).
+                // post-downsampled and `appliedScale` says so. The declared footprint is taken AT that whole-frame
+                // ceiling: 0.1 GB + 8.6 GB, measured in the ForgeOptimizer app since 0.1.1 (AB-T-0019; 0.1.0 declared a
+                // derived 1.05 + 11.5 GB that refused Optimize's Best on 16 GB Macs). Admission charges the 1080p worst
+                // case for every input. Explicit id, equal to the manifest's surface name today: without one the engine
+                // keys by that name, so a second checkpoint registered from this package would silently replace this
+                // one — and only a live run shows it (AB-L-0160).
                 id = try await registerRecording(model, RealPLKSRUpscalePackage.registration,
                                                         configuration: RealPLKSRConfiguration(),
                                                         id: "realplksr-webphoto-upscale")

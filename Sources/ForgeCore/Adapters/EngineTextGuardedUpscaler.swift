@@ -16,12 +16,17 @@
 //    VOSR2 ×2       (2026-09-26 §11.2)   generative 0.952 / 0.928 / 0.635   keepBase 0.800 / 0.633 / 0.426
 //    VOSR2 ×4                            generative 0.920 / 0.926 / 0.625   keepBase 0.778 / 0.000 / 0.356
 //    SeedVR2-3B ×4                       generative 0.902 / 0.862 / 0.623   (same base)
-//  The generative route read best on every page for BOTH tiers at BOTH scales, and the base tier (Real-ESRGAN)
-//  read worse than the un-restored input on the dense pages — it breaks and merges small strokes, and at ×4 it
-//  wiped page 090 to 0.000. The word composite sat between the two. So for these tier pairs the gate would have
-//  made text worse; both routes are OPT-IN in the policy, and a tier pair earns a route only by being measured
-//  through this adapter (the live test is the harness). The ×1 letter-rewrite hazard (AB-L-0172) is real but was
-//  measured against the un-restored input as the base, which this adapter's base tier is not — ×1 stays unmeasured.
+//  — those with Real-ESRGAN as the base. Re-measured 2026-09-29 with NERVE as the base (§11.3, VOSR2 generative):
+//    ×2   keepBase 0.894 / 0.810 / 0.597   protectWords 0.898 / 0.823 / 0.629   generative 0.952 / 0.928 / 0.635
+//    ×4   keepBase 0.876 / 0.754 / 0.488   protectWords 0.876 / 0.765 / 0.635   generative 0.920 / 0.926 / 0.625
+//  The generative route read best on every page for BOTH generative tiers at BOTH scales with Real-ESRGAN as the
+//  base, and in 5 of 6 cells with NERVE (the sixth: the composite +0.010 on the sparse page at ×4, and −0.006 on
+//  the same page at ×2 — noise). NERVE is a much better base than Real-ESRGAN, which broke and merged small strokes
+//  and at ×4 wiped page 090 to 0.000 — but NERVE still reads BELOW the un-restored input on both dense pages, so the
+//  document gate would still route legible pages to a worse result. So for every tier pair measured, both routes
+//  stay OPT-IN in the policy, and a tier pair earns a route only by being measured through this adapter (the live
+//  test is the harness). The ×1 letter-rewrite hazard (AB-L-0172) is real but was measured against the un-restored
+//  input as the base, which this adapter's base tier is not — ×1 stays unmeasured.
 //  VOSR2 is the default generative tier since v0.23.0: it reads at least as well and runs ~2× faster at ×4.
 //
 //  Three routes, decided on the INPUT before any model runs:
@@ -74,8 +79,9 @@ public final class EngineTextGuardedUpscaler {
     public var generative: ForgeModel
     /// The non-generative tier the protected words come from — the fast tier (`.upscale`: NERVE since 2026-09-28,
     /// Real-ESRGAN in the 2026-09-26 route measurements above): feed-forward, deterministic — "conservative
-    /// non-generative restoration inside the mask" (the N7 rule). The routes were earned with Real-ESRGAN as the base;
-    /// re-run `GuardedUpscaleLiveTests` before trusting an opt-in route with the new base.
+    /// non-generative restoration inside the mask" (the N7 rule). Re-measured with NERVE as the base 2026-09-29
+    /// (VOSR-EVAL §11.3): no opt-in route is earned for the VOSR2 pair at ×2 or ×4. A new base tier means re-running
+    /// `GuardedUpscaleLiveTests` before trusting any opt-in route with it.
     public var base: ForgeModel
 
     public init(service: ForgeEngineService,
