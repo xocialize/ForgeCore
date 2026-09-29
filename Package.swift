@@ -74,6 +74,12 @@ let package = Package(
         // backer, ours end to end (trained on the Commons-SR corpus, weights vendored in the package — no download).
         // Public since 2026-09-28, which keeps this manifest's whole closure public for CI.
         .package(url: "https://github.com/xocialize/mlx-realplksr-swift.git", from: "0.1.0"),
+        // HEART (AB-T-0189 / AB-R-0379) — the OPT-IN fidelity variant behind RealPLKSR: Phips/HEART, Apache-2.0 code and
+        // weights trained only on a CC0 corpus (AB-D-0106), 16.7 M-param HAT-iLN window attention; weights materialize
+        // from mlx-community/HEART-fp16 (34 MB per variant). Registered as `.upscaleHEART` — reachable, never a default
+        // route: the crossover (AB-T-0190) gave RealPLKSR DISTS at 12/12 rungs, HEART PSNR at 12/12 and a SSIMULACRA2 tie,
+        // at 4.5–5× the cost, and the operator chose the opt-in slot (AB-A-0128). Public since 2026-09-28.
+        .package(url: "https://github.com/xocialize/mlx-heart-swift.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/mlx-birefnet-swift.git", from: "0.4.0"),
         // 🔑 **The no-reference half of the two-oracle rule** (`CLAUDE.md`: *"SigLIP2 NR-IQA gates
         // whether to restore … SSIMULACRA2 gates how hard to compress"*). ForgeCore shipped the
@@ -125,6 +131,7 @@ let package = Package(
                 .product(name: "MLXSeedVR2", package: "mlx-seedvr2-swift"),
                 .product(name: "MLXVOSR", package: "mlx-vosr-swift"),
                 .product(name: "MLXRealPLKSR", package: "mlx-realplksr-swift"),
+                .product(name: "MLXHEART", package: "mlx-heart-swift"),
                 .product(name: "MLXBiRefNet", package: "mlx-birefnet-swift"),
                 .product(name: "MLXSigLIP2IQA", package: "mlx-siglip2-iqa-swift"),
                 .product(name: "MLXDDColor", package: "mlx-ddcolor-swift"),
@@ -141,6 +148,7 @@ let package = Package(
         .testTarget(name: "ForgeCoreTests", dependencies: [
             "ForgeCore",
             .product(name: "MLXNERVE", package: "mlx-nerve-swift"),   // UpscaleTierTests pins the defaults ForgeCore registers
+            .product(name: "MLXHEART", package: "mlx-heart-swift"),   // … and HEART's (the opt-in variant)
         ]),
     ]
 )

@@ -31,6 +31,7 @@ import MLXNERVE
 import MLXSeedVR2
 import MLXVOSR
 import MLXRealPLKSR
+import MLXHEART
 import MLXBiRefNet
 import MLXSigLIP2IQA
 import MLXDDColor
@@ -54,10 +55,11 @@ let log = Logger(subsystem: "com.xocialize.ForgeCore", category: "ForgeCore")
 /// Every model package Forge registers. One case per registration, *not* per capability —
 /// Optimize alone uses two (restore + upscale), and one flow registration feeds four consumers.
 ///
-/// 🔑 **`upscale`, `upscaleFidelity`, `upscaleQuality` and `upscaleGenerative` are four registrations behind ONE
-/// capability**, which is the engine's multi-package-per-`PackageID` pattern and the first place Forge uses it:
-/// NERVE is the fast tier (2026-09-28, replacing Real-ESRGAN), RealPLKSR the fidelity tier (2026-09-28), SeedVR2-3B
-/// the quality tier, VOSR2 the generative stills tier (2026-09-26), and the planner picks. Adding SeedVR2 does **not**
+/// 🔑 **`upscale`, `upscaleFidelity`, `upscaleQuality`, `upscaleGenerative` and `upscaleHEART` are five registrations
+/// behind ONE capability**, which is the engine's multi-package-per-`PackageID` pattern and the first place Forge uses
+/// it: NERVE is the fast tier (2026-09-28, replacing Real-ESRGAN), RealPLKSR the fidelity tier (2026-09-28), SeedVR2-3B
+/// the quality tier, VOSR2 the generative stills tier (2026-09-26), HEART the opt-in fidelity variant (2026-09-29,
+/// reachable but never a default route), and the planner picks. Adding SeedVR2 does **not**
 /// displace the fast tier — `MODEL-CATALOG.md`'s standing rule is that when SeedVR2 isn't viable (memory, chip,
 /// file) `videoUpscale` routes to the per-frame fast tier: *same tool, lighter backer.*
 ///
@@ -105,6 +107,19 @@ public enum ForgeModel: String, CaseIterable, Sendable {
     // losses add texture, but nothing is sampled. ⚠️ Not a general-superiority claim — the hold-out was Commons
     // content (AB-R-0285 ⚠️3); a third-party clean set is the missing measurement.
     case upscaleFidelity   // RealPLKSR (fp32, vendored) — the fidelity tier, "best" beside NERVE's "fast"
+    // ── upscaleHEART (AB-T-0189 / AB-T-0190 / AB-A-0128) ──
+    // Registered 2026-09-29 as the OPT-IN fidelity variant behind RealPLKSR — reachable (`measureUpscale`, a host's own
+    // routing), never a default route. HEART (Phips/HEART, `mlx-heart-swift`): Philip Hofmann's 16.7 M-param HAT-iLN
+    // window-attention SR, Apache-2.0 code and weights trained only on the CC0 LUCID corpus (AB-D-0106); the FIFTH
+    // `imageUpscale` backer. On the Forge bench `.fidelity` won every damaged cell against every arm (AB-R-0370); on the
+    // twelve-rung Commons ladder (AB-R-0379) RealPLKSR wins DISTS at 12/12 rungs while HEART wins PSNR at 12/12
+    // (+0.42 dB) and ties SSIMULACRA2 — DISTS is in RealPLKSR's training loss (AB-L-0186), so the plan's rule judged on
+    // the incumbent's objective; the operator chose the opt-in slot rather than a default. Cost: 416–450 ms per output
+    // Mpx on M5 Max, ≈ 4× RealPLKSR (mlx-heart-swift PORTING-SPEC H4). Port parity 127.5 dB vs the upstream PyTorch
+    // code; fp16 lane 67.6 dB vs that oracle and SSIMULACRA2-indistinguishable from fp32 (H3). ⚠️ i-LN normalises over
+    // the whole tensor, so its tiled output is NOT bit-equivalent to whole-frame (H5): the package defaults run whole
+    // frames only up to 512² of input and 512/32 tiles above (fp16 peak 3.2 GB through 1080p → 8K).
+    case upscaleHEART      // HEART .fidelity (fp16, mlx-community/HEART-fp16) — the opt-in fidelity VARIANT, not a default
     case matte          // BiRefNet
     case colorize       // DDColor
     case inpaint        // LaMa / MI-GAN
@@ -152,6 +167,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .upscaleQuality: return "SeedVR2-3B"
         case .upscaleGenerative: return "VOSR2"
         case .upscaleFidelity: return "RealPLKSR"
+        case .upscaleHEART: return "HEART"
         case .matte:      return "BiRefNet"
         case .colorize:   return "DDColor"
         case .inpaint:    return "LaMa / MI-GAN"
@@ -188,6 +204,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .upscaleQuality: return .imageUpscale
         case .upscaleGenerative: return .imageUpscale
         case .upscaleFidelity: return .imageUpscale
+        case .upscaleHEART: return .imageUpscale
         case .matte:      return .matting
         case .colorize:   return .imageColorize
         case .inpaint:    return .imageInpaint
@@ -544,6 +561,20 @@ public final class ForgeEngineService {
                 id = try await engine.register(RealPLKSRUpscalePackage.registration,
                                                configuration: RealPLKSRConfiguration(),
                                                id: "realplksr-webphoto-upscale")
+            case .upscaleHEART:
+                // HEART (mlx-heart-swift 0.1.0). Package defaults on purpose (the BRIDGE-067 discipline): variant
+                // `.fidelity` (heart_4x_otf_v2), the fp16 lane (every reduction held at fp32 inside; the package's
+                // BudgetAware drops a requested fp32 to fp16 under 14 GB), whole-frame up to 512² of INPUT pixels and
+                // 512/32 tiles above — measured, not inherited, because i-LN makes tiles differ from the whole frame.
+                // Native ×4; a ×2 request is post-downsampled (measured better than the native heart_2x checkpoint on
+                // damaged input) and `appliedScale` says so. The engine materializes only this variant's file
+                // (`WeightSourcing`, one role per variant × lane: mlx-community/HEART-fp16/heart_4x_otf_v2_fp16.safetensors
+                // + config.json, 34 MB) into its store on first prepare. Declared footprint fp16 1.06 GB + 7.6 GB on the
+                // in-app basis, PROVISIONAL (derived through the tile-driver sibling's measured ratios from a 3.18 GB
+                // MLX peak; REQUIREMENTS.md). Explicit id (AB-L-0160).
+                id = try await engine.register(HEARTUpscalePackage.registration,
+                                               configuration: HEARTConfiguration(),
+                                               id: "heart-upscale")
             case .matte:
                 id = try await engine.register(BiRefNetPackage.registration,
                                                configuration: BiRefNetConfiguration())

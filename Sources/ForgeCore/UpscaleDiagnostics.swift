@@ -50,7 +50,8 @@ extension ForgeEngineService {
     ///
     /// - Parameters:
     ///   - model: which registration to exercise — `.upscale` (NERVE, fast), `.upscaleFidelity` (RealPLKSR),
-    ///     `.upscaleQuality` (SeedVR2-3B) or `.upscaleGenerative` (VOSR2). All four back `.imageUpscale`.
+    ///     `.upscaleQuality` (SeedVR2-3B), `.upscaleGenerative` (VOSR2) or `.upscaleHEART` (HEART, the opt-in
+    ///     fidelity variant). All five back `.imageUpscale`.
     /// - Throws: `DiagnosticsError.notRegistered` when the tier failed to register, carrying the
     ///   registration failure text rather than a bare nil — a license rejection and a missing weights
     ///   folder are different problems and the caller should be able to tell them apart.

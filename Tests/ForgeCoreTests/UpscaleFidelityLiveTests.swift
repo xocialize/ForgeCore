@@ -18,7 +18,9 @@
 //  ≥ 25 dB luma PSNR — a fidelity tier's own promise, and a generous floor for garbage, not a quality score.
 //
 //  The fast tier (`.upscale` — Real-ESRGAN in the AB-R-0365 runs, NERVE since 2026-09-28) runs the same inputs
-//  afterwards as the cost reference. Load and run are timed separately (see
+//  afterwards as the cost reference. `FORGE_FIDELITY_E2E_ARMS=upscaleHEART,upscaleFidelity` runs HEART, the opt-in
+//  fidelity variant (registered 2026-09-29), through the same path — its 34 MB fp16 file materializes from
+//  mlx-community/HEART-fp16 into the attached store on the first prepare. Load and run are timed separately (see
 //  `UpscaleDiagnostics`); `phys_footprint` is sampled after each run, and its peak is the PROCESS'S LIFETIME peak
 //  (monotonic), which is why the fidelity arm runs first. Outputs and a JSON receipt land in the out dir (default:
 //  the temp dir) — corpus media, never committed.
@@ -55,6 +57,11 @@ import UniformTypeIdentifiers
         try FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
 
         let service = ForgeEngineService()
+        // A model store so a WeightSourcing tier (HEART) can be materialized by the engine — the same seam the guarded
+        // live test uses: FORGE_FIDELITY_E2E_STORE, else the guarded test's default; vendored tiers ignore it.
+        let store = Self.env["FORGE_FIDELITY_E2E_STORE"].map { URL(fileURLWithPath: $0) }
+            ?? FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Application Support/Forge/Models")
+        if FileManager.default.fileExists(atPath: store.path) { await service.attachModelStore(root: store) }
         await service.registerAll()
         for arm in arms {
             try #require(service.packageID(for: arm) != nil,
