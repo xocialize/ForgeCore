@@ -1,5 +1,5 @@
 {
-  "originHash" : "c50f9fb512b1417a926a8de320cbff5aaa9082cc14554d68682d456127f134a2",
+  "originHash" : "d87079ad0f38d846031f2abac7921b779d38ed5270a2a1537d073dd8147fb002",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -168,8 +168,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-engine-swift.git",
       "state" : {
-        "revision" : "ef19ad73b6efeab0f599791706d6d141b5634b08",
-        "version" : "0.62.0"
+        "revision" : "133b6b176913142274211c346f9ba5642ea43c64",
+        "version" : "0.63.0"
       }
     },
     {
@@ -187,6 +187,15 @@
       "location" : "https://github.com/xocialize/mlx-gfpgan-swift.git",
       "state" : {
         "revision" : "c8582091242c1ae8ab7a5f876c3023d9e13df040",
+        "version" : "0.1.0"
+      }
+    },
+    {
+      "identity" : "mlx-heart-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/xocialize/mlx-heart-swift.git",
+      "state" : {
+        "revision" : "193099e74b1e135f7f47db1a4964b28dbacfa67b",
         "version" : "0.1.0"
       }
     },
