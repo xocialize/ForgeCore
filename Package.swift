@@ -74,8 +74,8 @@ let package = Package(
         // The FIDELITY stills tier behind `imageUpscale` — RealPLKSR `4x_webphoto_realplksr` (AB-T-0186 Step 1): a fourth
         // backer, ours end to end (trained on the Commons-SR corpus, weights vendored in the package — no download).
         // Public since 2026-09-28, which keeps this manifest's whole closure public for CI. 0.1.1 = the in-app
-        // phys_footprint re-baseline (0.1 + 8.6 GB, AB-T-0019): below it the governor charges a derived 12.55 GB and
-        // refuses Optimize's Best on a 16 GB Mac.
+        // phys_footprint re-baseline (0.1 + 8.6 GB, AB-T-0019): below it the governor charges a derived 12.55 GB, which
+        // on a 16 GB Mac (budget ≈ 12.7 GB) admits Optimize's Best only after evicting everything else.
         .package(url: "https://github.com/xocialize/mlx-realplksr-swift.git", from: "0.1.1"),
         // HEART (AB-T-0189 / AB-R-0379) — the OPT-IN fidelity variant behind RealPLKSR: Phips/HEART, Apache-2.0 code and
         // weights trained only on a CC0 corpus (AB-D-0106), 16.7 M-param HAT-iLN window attention; weights materialize

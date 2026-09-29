@@ -559,8 +559,8 @@ public final class ForgeEngineService {
                 // whole-frame up to 1920×1080 INPUT pixels, 256/32 tiles above. Native ×4; a ×2 request is
                 // post-downsampled and `appliedScale` says so. The declared footprint is taken AT that whole-frame
                 // ceiling: 0.1 GB + 8.6 GB, measured in the ForgeOptimizer app since 0.1.1 (AB-T-0019; 0.1.0 declared a
-                // derived 1.05 + 11.5 GB that refused Optimize's Best on 16 GB Macs). Admission charges the 1080p worst
-                // case for every input. Explicit id, equal to the manifest's surface name today: without one the engine
+                // derived 1.05 + 11.5 GB, which left a 16 GB Mac's ≈ 12.7 GB budget ~0.15 GB of headroom). Admission
+                // charges the 1080p worst case for every input. Explicit id, equal to the manifest's surface name today: without one the engine
                 // keys by that name, so a second checkpoint registered from this package would silently replace this
                 // one — and only a live run shows it (AB-L-0160).
                 id = try await registerRecording(model, RealPLKSRUpscalePackage.registration,
