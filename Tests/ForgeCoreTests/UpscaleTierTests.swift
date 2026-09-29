@@ -30,8 +30,9 @@ import MLXHEART
         #expect(service.packageID(for: .upscale)?.rawValue == "nerve-upscale")
     }
 
-    /// ForgeCore registers the package defaults; these are the defaults it relies on — `.fidelity` (the plan's pick
-    /// until the crossover AB-T-0190 reports) on the fp16 lane, with a native ×2 route so HD → 4K never builds 8K.
+    /// ForgeCore registers the package defaults; these are the defaults it relies on — `.fidelity` (kept after the
+    /// crossover AB-R-0379, whose DISTS pick `.sharp` failed its own PSNR guard — operator decision AB-D-0107) on the
+    /// fp16 lane, with a native ×2 route so HD → 4K never builds 8K.
     @Test func fastTierDefaultsAreThePlansChoice() {
         let c = NERVEConfiguration()
         #expect(c.variant == .fidelity)

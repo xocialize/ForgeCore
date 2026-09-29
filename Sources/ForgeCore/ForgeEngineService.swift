@@ -483,9 +483,10 @@ public final class ForgeEngineService {
                                                configuration: NAFNetConfiguration(variant: restoreVariant))
             case .upscale:
                 // NERVE (mlx-nerve-swift ≥ 0.1.0) — the fast tier since 2026-09-28, replacing Real-ESRGAN (AB-T-0186
-                // Step 3). Package defaults on purpose (the BRIDGE-067 discipline): variant `.fidelity` — the plan's
-                // default until the NERVE/HEART crossover (AB-T-0190) reports, whose fixed rule then picks among
-                // `.fidelity`/`.clean`/`.sharp` —, the fp16 lane (70.5+ dB vs fp32, faster, half the peak), whole-frame
+                // Step 3). Package defaults on purpose (the BRIDGE-067 discipline): variant `.fidelity` — KEPT after
+                // the crossover (AB-R-0379): its DISTS rule pointed at `.sharp`, but the pre-registered guard fired
+                // (`.sharp` is below bicubic PSNR at 12/12 rungs; PSNR and SSIMULACRA2 prefer `.fidelity`), and the
+                // operator kept `.fidelity` (AB-A-0128 → AB-D-0107) —, the fp16 lane (70.5+ dB vs fp32, faster, half the peak), whole-frame
                 // up to 1920×1080 INPUT pixels, and above that 512 px tiles with a 56 px frame-cropped halo that
                 // reproduce the whole-frame output (NERVE's receptive field is 51 px; plain overlap tiles read 62.9 dB
                 // with the error in the seams). Native ×4 and ×2 (`.fidelity` ×2 → the native 2x_NERVE_OTF_gan
