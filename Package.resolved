@@ -51,8 +51,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/ForgeOptimizerKit.git",
       "state" : {
-        "revision" : "eea3ec7b24fd35d88ed7a9e7c1596aab818458c4",
-        "version" : "0.19.0"
+        "revision" : "5ebece7ff436caa191893b909e1d8d36b135e542",
+        "version" : "0.19.1"
       }
     },
     {
@@ -105,8 +105,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/media-bridge.git",
       "state" : {
-        "revision" : "ec3e67427f003148714ebe271120dd78c29f9116",
-        "version" : "0.39.1"
+        "revision" : "34c28725586febdebe6cb7c18e330d92ba876553",
+        "version" : "0.40.0"
       }
     },
     {
