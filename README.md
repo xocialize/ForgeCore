@@ -40,6 +40,28 @@ Three ordering facts that are easy to get wrong, and each cost a bug once:
    is bounded at `MLXServeEngine` construction; an app-side write fights it. Read
    `engine.appliedGPUCacheLimitBytes` to see what was applied.
 
+## Video upscale: declare what the clip is
+
+Two `videoUpscale` tiers, and the route between them is the **caller's declaration**, not a guess:
+
+```swift
+let route = ForgeEngineService.videoUpscaleRoute(for: .liveAction)   // .upscaleVideoLiveAction (FlashVSR)
+let gate  = ForgeEngineService.liveActionVideoUpscaleFits(sourceWidth: 640, sourceHeight: 360, budgetBytes: budget)
+let out   = try await forge.upscaleVideo(video, scale: 4, content: .liveAction)   // out.model names the tier that ran
+```
+
+- **`.liveAction` → FlashVSR** (`.upscaleVideoLiveAction`, id `flashvsr-upscale`): one-step streaming diffusion VSR,
+  much faster than SeedVR2 and sharper on resolution-limited faces. It is **generative** and renders anime, cartoons
+  and graphics as photographic texture — so it is reached only by declaration.
+- **`.drawn` / `.unspecified` → SeedVR2** (`.upscaleQuality`): exactly what `upscaleVideo(_:scale:)` always did.
+
+Forge has no validated detector for live action vs drawn content (the mechanical classifier is off by measurement and
+the V-JEPA2 hint ships inert), so **ask the user** — a "Live action / Animation & graphics" choice — rather than
+defaulting to `.liveAction`. A routed tier that cannot run throws its own reason (`DiagnosticsError.notRegistered`, or
+the engine's refusal above FlashVSR's measured 1920×1152 output ceiling); it is never swapped for the other tier.
+`liveActionVideoUpscaleFits` answers "can this machine run it" from the package's own declared footprint before
+anything loads.
+
 ## The planner hint (§6.3) ships inert — deliberately
 
 `EngineContentHintProvider` implements `ForgeOptimizerKit`'s `ContentHintProvider` over V-JEPA2

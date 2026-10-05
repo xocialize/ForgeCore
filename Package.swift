@@ -83,6 +83,12 @@ let package = Package(
         // route: the crossover (AB-T-0190) gave RealPLKSR DISTS at 12/12 rungs, HEART PSNR at 12/12 and a SSIMULACRA2 tie,
         // at 4.5–5× the cost, and the operator chose the opt-in slot (AB-A-0128). Public since 2026-09-28.
         .package(url: "https://github.com/xocialize/mlx-heart-swift.git", from: "0.1.0"),
+        // FlashVSR v1.1 — the LIVE-ACTION generative tier behind `videoUpscale` (registered 2026-10-04): one-step streaming
+        // diffusion VSR (OpenImagingLab, Apache-2.0 code AND weights), ported to Swift/MLX with a Metal block-sparse attention
+        // kernel; weights materialize from mlx-community/FlashVSR-v1.1-bf16 (3.5 GB). ⚠️ Generative: it renders anime and
+        // graphics as photographic texture, so it is reachable ONLY for content the caller declares live action
+        // (`ForgeEngineService.videoUpscaleRoute(for:)`) — never a default route. Public since 2026-10-04.
+        .package(url: "https://github.com/xocialize/mlx-flashvsr-swift.git", from: "0.1.1"),  // 0.1.1 = builds on mlx-swift 0.31.x (SeedVR2 caps this graph < 0.32)
         .package(url: "https://github.com/xocialize/mlx-birefnet-swift.git", from: "0.4.0"),
         // 🔑 **The no-reference half of the two-oracle rule** (`CLAUDE.md`: *"SigLIP2 NR-IQA gates
         // whether to restore … SSIMULACRA2 gates how hard to compress"*). ForgeCore shipped the
@@ -135,6 +141,7 @@ let package = Package(
                 .product(name: "MLXVOSR", package: "mlx-vosr-swift"),
                 .product(name: "MLXRealPLKSR", package: "mlx-realplksr-swift"),
                 .product(name: "MLXHEART", package: "mlx-heart-swift"),
+                .product(name: "MLXFlashVSR", package: "mlx-flashvsr-swift"),
                 .product(name: "MLXBiRefNet", package: "mlx-birefnet-swift"),
                 .product(name: "MLXSigLIP2IQA", package: "mlx-siglip2-iqa-swift"),
                 .product(name: "MLXDDColor", package: "mlx-ddcolor-swift"),
@@ -152,6 +159,7 @@ let package = Package(
             "ForgeCore",
             .product(name: "MLXNERVE", package: "mlx-nerve-swift"),   // UpscaleTierTests pins the defaults ForgeCore registers
             .product(name: "MLXHEART", package: "mlx-heart-swift"),   // … and HEART's (the opt-in variant)
+            .product(name: "MLXFlashVSR", package: "mlx-flashvsr-swift"), // … and FlashVSR's (the live-action video tier)
         ]),
     ]
 )

@@ -29,6 +29,7 @@ import MLXRestoreFormer
 import MLXBOPBTL
 import MLXNERVE
 import MLXSeedVR2
+import MLXFlashVSR
 import MLXVOSR
 import MLXRealPLKSR
 import MLXHEART
@@ -120,6 +121,21 @@ public enum ForgeModel: String, CaseIterable, Sendable {
     // the whole tensor, so its tiled output is NOT bit-equivalent to whole-frame (H5): the package defaults run whole
     // frames only up to 512² of input and 512/32 tiles above (fp16 peak 3.2 GB through 1080p → 8K).
     case upscaleHEART      // HEART .fidelity (fp16, mlx-community/HEART-fp16) — the opt-in fidelity VARIANT, not a default
+    // ── upscaleVideoLiveAction (2026-10-04) ──
+    // FlashVSR v1.1 (OpenImagingLab, Apache-2.0 code AND weights; `mlx-flashvsr-swift`): one-step streaming diffusion
+    // video super-resolution — a Wan2.1-1.3B-shaped DiT with locality-constrained block-sparse attention (a Metal kernel
+    // in the port), a causal LQ projector and a small LQ-conditioned decoder. The SECOND `videoUpscale` backer, beside
+    // SeedVR2's video surface. Port gated against upstream's own code (isolated sub-ops ≤ 1e-5; E2E at upstream's own
+    // 1e-6-nudge floor — its hard top-k block selection makes that the meaningful bar, AB-L-0199). In the spike it was
+    // the faster, lighter generative video tier: 6–9× SeedVR2's speed on 1280×768 output, sharper on
+    // resolution-limited faces (FLASHVSR-SPIKE.md §5).
+    // 🚨 LIVE ACTION ONLY. It is generative and renders anime, cartoons and graphics as photographic texture (spike
+    // §0: SSIMULACRA2 −44 on an anime pan, gradient 2× the reference). Forge has no validated detector for that
+    // distinction (`ContentClassifier.autoDetectEnabled == false`; the V-JEPA2 hint ships inert), so the route is
+    // DECLARED: `videoUpscaleRoute(for:)` sends only `.liveAction` here — drawn or unspecified content keeps the
+    // SeedVR2 route it had before this tier existed. Weights: mlx-community/FlashVSR-v1.1-bf16 (3.5 GB, materialized
+    // on first prepare). Footprint scales with output pixels (ActivationScaling, ceiling 1920×1152) — REQUIREMENTS.md.
+    case upscaleVideoLiveAction // FlashVSR v1.1 (bf16) — the live-action generative VIDEO tier; declared-content route only
     case matte          // BiRefNet
     case colorize       // DDColor
     case inpaint        // LaMa / MI-GAN
@@ -168,6 +184,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .upscaleGenerative: return "VOSR2"
         case .upscaleFidelity: return "RealPLKSR"
         case .upscaleHEART: return "HEART"
+        case .upscaleVideoLiveAction: return "FlashVSR"
         case .matte:      return "BiRefNet"
         case .colorize:   return "DDColor"
         case .inpaint:    return "LaMa / MI-GAN"
@@ -205,6 +222,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .upscaleGenerative: return .imageUpscale
         case .upscaleFidelity: return .imageUpscale
         case .upscaleHEART: return .imageUpscale
+        case .upscaleVideoLiveAction: return .videoUpscale
         case .matte:      return .matting
         case .colorize:   return .imageColorize
         case .inpaint:    return .imageInpaint
@@ -580,6 +598,17 @@ public final class ForgeEngineService {
                 id = try await registerRecording(model, HEARTUpscalePackage.registration,
                                                         configuration: HEARTConfiguration(),
                                                         id: "heart-upscale")
+            case .upscaleVideoLiveAction:
+                // FlashVSR (mlx-flashvsr-swift ≥ 0.1.0). Package defaults on purpose (the BRIDGE-067 discipline): the bf16
+                // lane (inside the fp32 seed spread on every full-reference metric, half the memory), seed 0, upstream's
+                // sparsity defaults (topk 2·768·1280/(H·W), local range 11), AdaIN colour fix. ×4 native, ×2 on a ×2 bicubic
+                // input; every source frame comes back with its own PTS. The engine materializes
+                // mlx-community/FlashVSR-v1.1-bf16 into its store on first prepare; the package's WorkloadDeclaring reads
+                // the clip's geometry from its `tkhd` box so an output above the measured 1920×1152 ceiling is refused
+                // before anything loads. Explicit id (AB-L-0160).
+                id = try await registerRecording(model, FlashVSRUpscalePackage.registration,
+                                                        configuration: FlashVSRConfiguration(),
+                                                        id: "flashvsr-upscale")
             case .matte:
                 id = try await registerRecording(model, BiRefNetPackage.registration,
                                                         configuration: BiRefNetConfiguration())

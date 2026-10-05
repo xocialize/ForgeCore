@@ -16,14 +16,35 @@
 //  cancellation, never as a request that might return quickly.** Cancellation is honoured at the
 //  package's CAN seams (per chunk).
 //
+//  🔑 **Since 2026-10-04 there are two video tiers, and the route between them is DECLARED.** FlashVSR
+//  (`.upscaleVideoLiveAction`) is the live-action generative tier: one-step, streaming, much faster than SeedVR2 —
+//  and it renders anime, cartoons and graphics as photographic texture. Forge has no validated detector for that
+//  distinction (the mechanical classifier is off by measurement, the V-JEPA2 hint ships inert), so the caller says
+//  what the clip is: `upscaleVideo(_:scale:content:)` sends `.liveAction` to FlashVSR and everything else to the
+//  SeedVR2 route `upscaleVideo(_:scale:)` has always taken. A tier that cannot run fails the call with its reason;
+//  it is never swapped for the other (the AB-T-0187 rule the stills tiers follow).
+//
 
 import CoreGraphics
 import Foundation
+import MLXFlashVSR
 import MLXServeCore
 import MLXToolKit
 
+/// What the caller DECLARES a clip to be — the only input the live-action route trusts.
+public enum VideoContent: String, Sendable, CaseIterable {
+    /// Camera footage of the real world — the content FlashVSR is for.
+    case liveAction
+    /// Anime, cartoons, motion graphics, screen recordings, UI, text overlays — never FlashVSR.
+    case drawn
+    /// Not declared. Routes like `.drawn`: the generative live-action tier is reached by declaration, never by default.
+    case unspecified
+}
+
 /// What one video upscale produced, plus the facts a receipt should carry.
 public struct VideoUpscaleOutcome: Sendable {
+    /// The tier that ran — `.upscaleQuality` (SeedVR2) or `.upscaleVideoLiveAction` (FlashVSR). A receipt names this.
+    public let model: ForgeModel
     public let video: Video
     /// What the package actually applied. ⚠️ May differ from the request — report this, not the ask.
     public let appliedScale: Int
@@ -51,8 +72,33 @@ extension ForgeEngineService {
     ///
     /// - Parameter scale: `nil` uses the package's default (2). Only 2 and 4 are accepted.
     public func upscaleVideo(_ video: Video, scale: Int? = nil) async throws -> VideoUpscaleOutcome {
-        guard let packageID = packageID(for: .upscaleQuality) else {
-            throw DiagnosticsError.notRegistered(.upscaleQuality, outcome(for: .upscaleQuality)?.failure)
+        try await upscaleVideo(video, scale: scale, on: .upscaleQuality)
+    }
+
+    /// Which registered tier serves a clip of declared `content`: FlashVSR for `.liveAction`, SeedVR2 for everything
+    /// else (the route that existed before the live-action tier). `nonisolated`: a UI can label its control before
+    /// touching the main actor.
+    nonisolated public static func videoUpscaleRoute(for content: VideoContent) -> ForgeModel {
+        content == .liveAction ? .upscaleVideoLiveAction : .upscaleQuality
+    }
+
+    /// Upscale a whole clip on the tier its DECLARED content routes to (`videoUpscaleRoute(for:)`).
+    ///
+    /// 🚨 **The declaration is the routing decision — ask the user rather than guess.** Declaring a cartoon `.liveAction`
+    /// sends it to a generative model that turns flat colour and line art into photographic texture. If the routed tier
+    /// is unavailable (did not register, or the engine refuses the clip — e.g. FlashVSR above its measured 1920×1152
+    /// output ceiling), this throws with that reason; it never falls back to the other tier.
+    ///
+    /// FlashVSR facts a UI needs: ×4 native and ×2; the first output arrives after 25 source frames, then 8 at a time;
+    /// every source frame comes back, with its own timestamp; memory scales with OUTPUT PIXELS, not clip length (check
+    /// `liveActionVideoUpscaleFits`).
+    public func upscaleVideo(_ video: Video, scale: Int? = nil, content: VideoContent) async throws -> VideoUpscaleOutcome {
+        try await upscaleVideo(video, scale: scale, on: Self.videoUpscaleRoute(for: content))
+    }
+
+    private func upscaleVideo(_ video: Video, scale: Int?, on model: ForgeModel) async throws -> VideoUpscaleOutcome {
+        guard let packageID = packageID(for: model) else {
+            throw DiagnosticsError.notRegistered(model, outcome(for: model)?.failure)
         }
         // ⚠️ `prepare` is keyed by capability with the package as disambiguator. Here the capability is
         // `.videoUpscale` even though `ForgeModel.upscaleQuality.capability` reports `.imageUpscale` —
@@ -64,11 +110,47 @@ extension ForgeEngineService {
                                             package: packageID)
         let seconds = Date().timeIntervalSince(started)
         guard let upscale = response as? VideoUpscaleResponse else {
-            throw DiagnosticsError.unexpectedResponse(.upscaleQuality)
+            throw DiagnosticsError.unexpectedResponse(model)
         }
-        return VideoUpscaleOutcome(video: upscale.video,
+        return VideoUpscaleOutcome(model: model,
+                                   video: upscale.video,
                                    appliedScale: upscale.appliedScale,
                                    seconds: seconds)
+    }
+
+    /// Whether the live-action tier (FlashVSR) can be expected to run a `sourceWidth × sourceHeight` clip at `scale`
+    /// within `budgetBytes`, computed from the PACKAGE'S OWN declaration so this gate and the engine's admission cannot
+    /// drift apart: resident + max(representative activation, `ActivationScaling` at the padded output pixels).
+    ///
+    /// - Returns: `withinCeiling` — whether the output is inside the measured envelope (1920×1152 for the bf16 lane); the
+    ///   engine refuses a run beyond it before loading anything, so a UI should say so rather than offer the control.
+    ///   `fits` — within the ceiling AND the predicted bytes fit the budget. `predictedBytes` — what admission reserves.
+    ///
+    /// Basis: `phys_footprint` measured through the real MLXServeEngine in a CLI process (bf16: 9.2 / 19.1 / 33.7 GB at
+    /// 640×384 / 1280×768 / 1920×1152 out) ×1.2 headroom — the in-app re-baseline is open (REQUIREMENTS.md).
+    nonisolated public static func liveActionVideoUpscaleFits(
+        sourceWidth: Int, sourceHeight: Int, scale: Int = 4, budgetBytes: UInt64
+    ) -> (fits: Bool, withinCeiling: Bool, predictedBytes: UInt64) {
+        let quant = FlashVSRConfiguration().quant
+        guard let fp = FlashVSRUpscalePackage.manifest.requirements.footprints.first(where: { $0.quant == quant }) else {
+            return (false, false, .max)
+        }
+        let pixels = Double(liveActionOutputPixels(sourceWidth: sourceWidth, sourceHeight: sourceHeight, scale: scale))
+        var activation = fp.peakActivationBytes
+        var within = true
+        if let scaling = fp.activationScaling {
+            activation = max(activation, scaling.projectedBytes(at: pixels))
+            within = scaling.covers(pixels)
+        }
+        let predicted = fp.residentBytes + activation
+        return (within && predicted <= budgetBytes, within, predicted)
+    }
+
+    /// The pixels FlashVSR actually computes per output frame: the ×`scale` frame padded up to multiples of 128 — the
+    /// unit of the package's `ActivationScaling` (its `WorkloadDeclaring` computes the same from the clip's `tkhd`).
+    nonisolated public static func liveActionOutputPixels(sourceWidth: Int, sourceHeight: Int, scale: Int = 4) -> Int {
+        let pad = { (n: Int) in (n * scale + 127) / 128 * 128 }
+        return pad(sourceWidth) * pad(sourceHeight)
     }
 
     /// Whether this machine can be expected to run the video tier at a given output geometry.
