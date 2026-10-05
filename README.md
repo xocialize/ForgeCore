@@ -51,7 +51,8 @@ let out   = try await forge.upscaleVideo(video, scale: 4, content: .liveAction) 
 ```
 
 - **`.liveAction` → FlashVSR** (`.upscaleVideoLiveAction`, id `flashvsr-upscale`): one-step streaming diffusion VSR,
-  much faster than SeedVR2 and sharper on resolution-limited faces. It is **generative** and renders anime, cartoons
+  much faster than SeedVR2 and sharper on resolution-limited faces — 0.72 s per output frame end to end at 1280×768,
+  ~2.1 at 1920×1152 (M5 Max, idle GPU; REQUIREMENTS.md). It is **generative** and renders anime, cartoons
   and graphics as photographic texture — so it is reached only by declaration.
 - **`.drawn` / `.unspecified` → SeedVR2** (`.upscaleQuality`): exactly what `upscaleVideo(_:scale:)` always did.
 

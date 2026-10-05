@@ -88,7 +88,7 @@ let package = Package(
         // kernel; weights materialize from mlx-community/FlashVSR-v1.1-bf16 (3.5 GB). ⚠️ Generative: it renders anime and
         // graphics as photographic texture, so it is reachable ONLY for content the caller declares live action
         // (`ForgeEngineService.videoUpscaleRoute(for:)`) — never a default route. Public since 2026-10-04.
-        .package(url: "https://github.com/xocialize/mlx-flashvsr-swift.git", from: "0.1.1"),  // 0.1.1 = builds on mlx-swift 0.31.x (SeedVR2 caps this graph < 0.32)
+        .package(url: "https://github.com/xocialize/mlx-flashvsr-swift.git", from: "0.2.0"),  // 0.2.0 = the idle-GPU-measured attention default (0.50 s/frame at 1280×768, 1.33 at 1920×1152; 0.1.x ran 720p at 0.83); 0.1.1+ builds on mlx-swift 0.31.x (SeedVR2 caps this graph < 0.32)
         .package(url: "https://github.com/xocialize/mlx-birefnet-swift.git", from: "0.4.0"),
         // 🔑 **The no-reference half of the two-oracle rule** (`CLAUDE.md`: *"SigLIP2 NR-IQA gates
         // whether to restore … SSIMULACRA2 gates how hard to compress"*). ForgeCore shipped the

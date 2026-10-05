@@ -1,5 +1,5 @@
 {
-  "originHash" : "4e864c8b6867b8d742013c65e3b695ae15048e1154a5ce1df0b4287822e0e5ab",
+  "originHash" : "e7b91c6fd3b6e420146a1a0f38a5678b77cbb3da5298d588e8467f2173358a95",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -186,8 +186,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-flashvsr-swift.git",
       "state" : {
-        "revision" : "1c656ce4965f85f8c6d3a1cebaaba21a847729cb",
-        "version" : "0.1.1"
+        "revision" : "ec67024ba2939115f780d4183b4653b8a99ed1ee",
+        "version" : "0.2.0"
       }
     },
     {
