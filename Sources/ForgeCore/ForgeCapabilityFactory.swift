@@ -23,6 +23,10 @@ public struct ForgeCapabilities {
     /// Optimize — NAFNet restore → NERVE (`.fast`) or RealPLKSR (`.best`) upscale (`ForgeOptimizerKit.ImageEnhancer`).
     /// Ask it `availability(of:)` to know whether a tier can run here, and why not.
     public let enhancer: EngineImageEnhancer
+    /// Optimize's **Live action** video upscale — FlashVSR on the whole clip (`ForgeOptimizerKit.VideoUpscaler`,
+    /// `UpscaleTier.liveAction`). Generative: offer it for camera footage only, and let the user's choice of it be the
+    /// declaration. Ask `availability(of:width:height:factor:)` with the clip's size — its memory follows the output frame.
+    public let videoUpscaler: EngineVideoUpscaler
     /// Extract quality tier — BiRefNet (`ExtractKit.MatteProvider`).
     public let matte: EngineMatteProvider
     /// Revive — DDColor (`ColorizeKit.ColorizeProvider`).
@@ -57,7 +61,9 @@ public struct ForgeCapabilities {
             // `.upscaleFidelity` (RealPLKSR) is Optimize's "best" upscale tier (`Options.upscaleTier`, AB-T-0187), but
             // availability stays keyed on the fast tier: Optimize runs without Best, and whether Best can run HERE is a
             // per-tier answer with a reason — `enhancer.availability(of: .best)` — not a capability-wide boolean.
-            ("Optimize", [.restore, .upscale, .upscaleFidelity], isRegistered(.restore) && isRegistered(.upscale)),
+            // `.upscaleVideoLiveAction` (FlashVSR) likewise: a per-clip answer, `videoUpscaler.availability(of:…)`.
+            ("Optimize", [.restore, .upscale, .upscaleFidelity, .upscaleVideoLiveAction],
+             isRegistered(.restore) && isRegistered(.upscale)),
             ("Extract",  [.matte, .promptMask, .promptMaskQuality, .flow], isRegistered(.matte)),
             ("Colorize", [.colorize, .flow], isRegistered(.colorize)),
             ("Erase",    [.inpaint, .promptMask, .promptMaskQuality, .flow], isRegistered(.inpaint)),
@@ -73,6 +79,7 @@ public struct ForgeCapabilities {
     public init(service: ForgeEngineService) {
         self.service = service
         self.enhancer   = EngineImageEnhancer(service: service)
+        self.videoUpscaler = EngineVideoUpscaler(service: service)
         self.matte      = EngineMatteProvider(service: service)
         self.colorize   = EngineColorizeProvider(service: service)
         self.inpaint    = EngineInpaintProvider(service: service)

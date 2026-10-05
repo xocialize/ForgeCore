@@ -10,8 +10,11 @@
 //  • A routed tier that is not available fails with ITS reason — never a silent swap to the other tier.
 //  • The fit gate reads the PACKAGE'S declaration (resident + max(scalar, ActivationScaling)), so it cannot drift from
 //    what the engine admits against; the measured ceiling is 1920×1152 output for the bf16 lane.
+//  • The Optimizer's "Live action" tier (Kit `UpscaleTier.liveAction`) reaches FlashVSR through `EngineVideoUpscaler`
+//    and only through it: the per-frame `EngineImageEnhancer` refuses it, and the video upscaler serves nothing else.
 //
 
+import ForgeOptimizerKit
 import Foundation
 import MLXFlashVSR
 import MLXToolKit
@@ -80,6 +83,58 @@ struct VideoUpscaleRouteTests {
                 Issue.record("\(content): unexpected \(error)")
             }
         }
+    }
+
+    // MARK: - the Optimizer's Live action tier (Kit 0.20.0)
+
+    @Test @MainActor func liveActionTierMapsToFlashVSRBothWays() {
+        #expect(EngineImageEnhancer.model(for: .liveAction) == .upscaleVideoLiveAction)
+        #expect(EngineImageEnhancer.tier(for: .upscaleVideoLiveAction) == .liveAction)
+        #expect(EngineVideoUpscaler.model == .upscaleVideoLiveAction)
+        // The stills tiers keep their backers.
+        #expect(EngineImageEnhancer.model(for: .fast) == .upscale)
+        #expect(EngineImageEnhancer.model(for: .best) == .upscaleFidelity)
+    }
+
+    /// The per-frame enhancer never offers the whole-clip tier, registered or not.
+    @Test @MainActor func imageEnhancerRefusesLiveAction() async {
+        let service = ForgeEngineService()
+        await service.registerAll()
+        let verdict = await EngineImageEnhancer(service: service).availability(of: .liveAction)
+        #expect(!verdict.isAvailable)
+        #expect(verdict.unavailableReason == UpscaleTier.liveActionStillReason)
+    }
+
+    /// The video upscaler serves Live action only, says which model is missing when it is, and needs a factor.
+    @Test @MainActor func videoUpscalerRefusalsNameTheirCause() async {
+        let bare = EngineVideoUpscaler(service: ForgeEngineService())          // no registerAll
+        let missing = await bare.availability(of: .liveAction, width: 320, height: 192, factor: .x4)
+        #expect(missing.unavailableReason?.hasPrefix("FlashVSR is not registered") == true, "\(missing)")
+
+        let service = ForgeEngineService()
+        await service.registerAll()
+        let upscaler = EngineVideoUpscaler(service: service)
+        let fast = await upscaler.availability(of: .fast, width: 320, height: 192, factor: .x4)
+        #expect(fast.unavailableReason?.contains("Live action only") == true, "\(fast)")
+        let none = await upscaler.availability(of: .liveAction, width: 320, height: 192, factor: .none)
+        #expect(none.unavailableReason == "no upscale factor was asked for")
+        let unread = await upscaler.availability(of: .liveAction, width: 0, height: 0, factor: .x4)
+        #expect(unread.unavailableReason == "the clip's frame size could not be read")
+    }
+
+    /// Past the measured output ceiling the reason says so — and points at ×2 when ×2 is inside it.
+    @Test @MainActor func videoUpscalerNamesTheCeilingAndTheWayUnderIt() async {
+        let service = ForgeEngineService()
+        await service.registerAll()
+        let upscaler = EngineVideoUpscaler(service: service)
+        // 640×360 ×4 → 2560×1440 out (padded 2560×1536): past 1920×1152; ×2 → 1280×720 (1280×768) is inside.
+        let x4 = await upscaler.availability(of: .liveAction, width: 640, height: 360, factor: .x4)
+        let why = x4.unavailableReason ?? ""
+        #expect(why.contains("2560×1440 out") && why.contains("2.2-megapixel") && why.hasSuffix("×2 is inside it"), "\(why)")
+        #expect(x4.model == "FlashVSR")
+        // HD ×4 has no ×2 way under (3840×2160 is past it too), so no suggestion.
+        let hd = await upscaler.availability(of: .liveAction, width: 1920, height: 1080, factor: .x4)
+        #expect(hd.unavailableReason?.contains("×2 is inside it") == false, "\(hd)")
     }
 
     // MARK: - fit gate

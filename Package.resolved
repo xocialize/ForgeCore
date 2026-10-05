@@ -1,5 +1,5 @@
 {
-  "originHash" : "e7b91c6fd3b6e420146a1a0f38a5678b77cbb3da5298d588e8467f2173358a95",
+  "originHash" : "3945ea045474875cf464fb84491e1da8d2a80b4ca2a2fc3a937a0cb5817066be",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -51,8 +51,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/ForgeOptimizerKit.git",
       "state" : {
-        "revision" : "5ebece7ff436caa191893b909e1d8d36b135e542",
-        "version" : "0.19.1"
+        "revision" : "4353466f8fcc6915c6a99487f9648054f1d60438",
+        "version" : "0.20.0"
       }
     },
     {

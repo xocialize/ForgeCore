@@ -24,12 +24,18 @@
 //  SeedVR2 route `upscaleVideo(_:scale:)` has always taken. A tier that cannot run fails the call with its reason;
 //  it is never swapped for the other (the AB-T-0187 rule the stills tiers follow).
 //
+//  `EngineVideoUpscaler` (below) is that route as ForgeOptimizerKit's `VideoUpscaler` seam: the Optimizer's
+//  "Live action" upscale tier (`UpscaleTier.liveAction`, Kit 0.20.0) — the user's choice of the tier IS the
+//  declaration.
+//
 
 import CoreGraphics
+import ForgeOptimizerKit
 import Foundation
 import MLXFlashVSR
 import MLXServeCore
 import MLXToolKit
+import OSLog
 
 /// What the caller DECLARES a clip to be — the only input the live-action route trusts.
 public enum VideoContent: String, Sendable, CaseIterable {
@@ -252,5 +258,131 @@ extension ForgeEngineService {
         let extra = Double(max(0, outputTilePositions - 1))
         let headroom = Double(budgetBytes) - singleTileBytes
         return Int(min(extra * perTileBankBytes, headroom))
+    }
+}
+
+/// ForgeOptimizerKit's `VideoUpscaler` seam, engine-backed: `UpscaleTier.liveAction` → FlashVSR
+/// (`.upscaleVideoLiveAction`) on the declared live-action route. That is the only tier it serves.
+///
+/// The Kit reaches this only when the user picked Live action, which is the content declaration the route
+/// requires: FlashVSR turns drawn content into photographic texture, and nothing here guesses what a clip is.
+/// `availability` answers per clip — FlashVSR's memory follows the OUTPUT frame size — from the package's own
+/// declaration (`liveActionVideoUpscaleFits`), so the control's state and the engine's admission cannot disagree.
+@MainActor
+public final class EngineVideoUpscaler: VideoUpscaler {
+
+    private let service: ForgeEngineService
+
+    public init(service: ForgeEngineService) {
+        self.service = service
+    }
+
+    /// The registration this upscaler runs.
+    public static let model = ForgeModel.upscaleVideoLiveAction
+
+    public func availability(of tier: UpscaleTier, width: Int, height: Int,
+                             factor: UpscaleFactor) async -> UpscaleTierAvailability {
+        let model = Self.model
+        guard tier == .liveAction else {
+            return .unavailable(tier, reason: "the video upscaler serves Live action only — \(tier.rawValue) runs per frame")
+        }
+        guard let scale = factor.requestedScale else {
+            return .unavailable(tier, model: model.modelName, reason: "no upscale factor was asked for")
+        }
+        guard service.packageID(for: model) != nil else {
+            let why = service.outcome(for: model)?.failure ?? "registration has not run"
+            return .unavailable(tier, model: model.modelName, reason: "\(model.modelName) is not registered — \(why)")
+        }
+        if let verdict = await service.admissibility(for: model), !verdict.eligibility.isEligible {
+            return .unavailable(tier, model: model.modelName,
+                                reason: "this Mac cannot run \(model.modelName) — \(verdict.eligibility)")
+        }
+        guard width > 0, height > 0 else {
+            return .unavailable(tier, model: model.modelName, reason: "the clip's frame size could not be read")
+        }
+        let budget = await service.memoryBudgetBytes
+        let fit = ForgeEngineService.liveActionVideoUpscaleFits(sourceWidth: width, sourceHeight: height,
+                                                                scale: scale, budgetBytes: budget)
+        if !fit.withinCeiling {
+            var why = "a \(width)×\(height) clip at ×\(scale) is \(width * scale)×\(height * scale) out — past the "
+                + "\(Self.ceilingLabel) output frame \(model.modelName)'s memory was measured at"
+            if scale == 4, ForgeEngineService.liveActionVideoUpscaleFits(sourceWidth: width, sourceHeight: height,
+                                                                         scale: 2, budgetBytes: .max).withinCeiling {
+                why += "; ×2 is inside it"
+            }
+            return .unavailable(tier, model: model.modelName, reason: why)
+        }
+        if !fit.fits {
+            return .unavailable(tier, model: model.modelName,
+                                reason: "\(model.modelName) needs \(EngineImageEnhancer.gb(fit.predictedBytes)) for a "
+                                    + "\(width)×\(height) clip at ×\(scale); the engine's memory budget on this Mac is "
+                                    + EngineImageEnhancer.gb(budget))
+        }
+        return .available(tier, model: model.modelName)
+    }
+
+    /// Runs the whole clip through FlashVSR and writes the package's video-only HEVC to `output`. Progress is the
+    /// package's own frame count (`RunProgress` `.upsample` reports on the engine's run monitor), read every 250 ms.
+    /// Cancelling the calling task cancels the engine run at its next chunk.
+    public func upscale(_ input: URL, factor: UpscaleFactor, tier: UpscaleTier, output: URL,
+                        progress: @escaping @Sendable (Int, Int) -> Void) async throws -> VideoUpscaleReport {
+        let model = Self.model
+        guard tier == .liveAction else { throw UpscaleError.notThisUpscalersTier(tier) }
+        guard let scale = factor.requestedScale else { throw UpscaleError.noFactor }
+        let format: Video.Format = input.pathExtension.lowercased() == "mov" ? .mov : .mp4
+        let video = Video(format: format, data: try Data(contentsOf: input, options: .mappedIfSafe))
+
+        let monitor = service.engine.runProgress
+        let packageKey = service.packageID(for: model)?.description
+        let watcher = Task { @MainActor in
+            var last = -1
+            while !Task.isCancelled {
+                if let report = monitor.report(for: .videoUpscale, package: packageKey),
+                   let step = report.step, let total = report.totalSteps, step != last {
+                    last = step
+                    progress(step, total)
+                }
+                try? await Task.sleep(nanoseconds: 250_000_000)
+            }
+        }
+        defer { watcher.cancel() }
+
+        let outcome: VideoUpscaleOutcome
+        do {
+            outcome = try await service.upscaleVideo(video, scale: scale, content: .liveAction)
+        } catch {
+            if let why = EngineImageEnhancer.governorRefusal(error) { throw UpscaleError.declined(model, why) }
+            throw error
+        }
+        try outcome.video.data.write(to: output, options: .atomic)
+        log.notice("Video upscale: \(outcome.model.modelName, privacy: .public) ×\(outcome.appliedScale, privacy: .public) in \(outcome.seconds, format: .fixed(precision: 1), privacy: .public) s (\(outcome.secondsPerFrame ?? .nan, format: .fixed(precision: 2), privacy: .public) s/frame)")
+        // Reported from the registration that ran (the route's answer), never from the request.
+        return VideoUpscaleReport(tier: EngineImageEnhancer.tier(for: outcome.model), model: outcome.model.modelName)
+    }
+
+    /// FlashVSR's measured output ceiling in words, from the package's own `ActivationScaling`.
+    static var ceilingLabel: String {
+        let quant = FlashVSRConfiguration().quant
+        let ceiling = FlashVSRUpscalePackage.manifest.requirements.footprints
+            .first { $0.quant == quant }?.activationScaling?.measuredCeiling
+        return ceiling.map { String(format: "%.1f-megapixel", $0 / 1e6) } ?? "measured"
+    }
+
+    public enum UpscaleError: Error, CustomStringConvertible {
+        case notThisUpscalersTier(UpscaleTier)
+        case noFactor
+        /// The engine's memory governor refused the run at admission; carries its reason in the user's terms.
+        case declined(ForgeModel, String)
+
+        public var description: String {
+            switch self {
+            case .notThisUpscalersTier(let tier):
+                return "the video upscaler serves Live action only — \(tier.rawValue) runs per frame"
+            case .noFactor:
+                return "no upscale factor was asked for"
+            case .declined(let model, let why):
+                return "\(model.modelName) was declined by the engine's memory governor — \(why)"
+            }
+        }
     }
 }

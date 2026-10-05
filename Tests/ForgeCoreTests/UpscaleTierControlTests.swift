@@ -36,12 +36,15 @@ import MLXToolKit
     /// Before registration nothing is available, and the reason says so — a tier is never "available" by default.
     @Test func unregisteredTiersAreUnavailableWithTheReason() async {
         let enhancer = EngineImageEnhancer(service: ForgeEngineService())
-        for tier in UpscaleTier.allCases {
+        for tier in UpscaleTier.allCases where !tier.isVideoOnly {
             let verdict = await enhancer.availability(of: tier)
             #expect(!verdict.isAvailable)
             #expect(verdict.model == EngineImageEnhancer.model(for: tier).modelName)
             #expect(verdict.unavailableReason?.contains("is not registered") == true, "\(verdict)")
         }
+        // The whole-clip tier is refused as a video tier, registered or not — never "not registered" on a still.
+        let live = await enhancer.availability(of: .liveAction)
+        #expect(live.unavailableReason == UpscaleTier.liveActionStillReason)
     }
 
     /// A Mac whose engine budget holds exactly NERVE's declared working set: Fast is available, Best is not, and the

@@ -118,7 +118,8 @@ import MLXHEART
     @Test @MainActor func optimizeListsTheFidelityTier() {
         let caps = ForgeCapabilities(service: ForgeEngineService())   // no registerAll — construction only
         let optimize = caps.qualityTierAvailability.first { $0.capability == "Optimize" }
-        #expect(optimize?.models == [.restore, .upscale, .upscaleFidelity])
+        // FlashVSR joined 2026-10-04 as the Live action video tier — listed, availability per clip (`videoUpscaler`).
+        #expect(optimize?.models == [.restore, .upscale, .upscaleFidelity, .upscaleVideoLiveAction])
     }
 
     /// The guard adapter accepts either generative tier (it is main-actor isolated, like the service it wraps).

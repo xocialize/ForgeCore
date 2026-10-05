@@ -63,6 +63,13 @@ the engine's refusal above FlashVSR's measured 1920×1152 output ceiling); it is
 `liveActionVideoUpscaleFits` answers "can this machine run it" from the package's own declared footprint before
 anything loads.
 
+**In the Optimizer** that choice is the upscale control's third segment, *Live action*, offered for a video source
+only (ForgeOptimizerKit 0.20.0, `UpscaleTier.liveAction`). `ForgeCapabilities.videoUpscaler` (`EngineVideoUpscaler`)
+implements the Kit's `VideoUpscaler` seam over the `.liveAction` route: `availability(of:width:height:factor:)` answers
+per clip — not registered, not eligible, past the measured output ceiling (and whether ×2 is inside it), or over this
+Mac's budget, each with its numbers — and `upscale` reports the package's own frame count as progress (the engine's
+`RunProgress` `.upsample` reports). The per-frame `EngineImageEnhancer` refuses the tier on a still.
+
 ## The planner hint (§6.3) ships inert — deliberately
 
 `EngineContentHintProvider` implements `ForgeOptimizerKit`'s `ContentHintProvider` over V-JEPA2

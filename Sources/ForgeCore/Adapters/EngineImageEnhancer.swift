@@ -37,10 +37,15 @@ public final class EngineImageEnhancer: ImageEnhancer {
     /// rungs (AB-R-0285) at ~5× NERVE's wall time (0.75 s vs 3.7 s at 1080p ×4, M5 Max) — so no classifier picks it.
     /// HEART (`.upscaleHEART`) and VOSR2 (`.upscaleGenerative`) are deliberately off this map: exposing them is a
     /// product call, and both stay reachable through `measureUpscale` and a host's own routing.
+    ///
+    /// `.liveAction` maps to FlashVSR (`.upscaleVideoLiveAction`) so the receipt mapping covers every tier, but this
+    /// enhancer never runs it: it is a whole-clip video tier served by `EngineVideoUpscaler`, and a still asked for it
+    /// is refused (by the Kit first, and by `availability(of:)` / `enhanceReporting` here too).
     public static func model(for tier: UpscaleTier) -> ForgeModel {
         switch tier {
         case .fast: return .upscale
         case .best: return .upscaleFidelity
+        case .liveAction: return .upscaleVideoLiveAction
         }
     }
 
@@ -75,6 +80,9 @@ public final class EngineImageEnhancer: ImageEnhancer {
 
         // The tier's own backer or nothing. A tier that cannot run throws with its reason; the other tier never
         // stands in for it, because a "Best" that ran Fast would ship one model's pixels under another's name.
+        guard !options.upscaleTier.isVideoOnly else {
+            throw EnhanceError.videoOnlyTier(options.upscaleTier)
+        }
         let model = Self.model(for: options.upscaleTier)
         guard let upscaleID = service.packageID(for: model) else {
             throw EnhanceError.unavailable(model, service.outcome(for: model)?.failure)
@@ -112,6 +120,9 @@ public final class EngineImageEnhancer: ImageEnhancer {
     /// holding memory, a workload over its declared ceiling) fails with `EnhanceError.declined` and its reason.
     public func availability(of tier: UpscaleTier) async -> UpscaleTierAvailability {
         let model = Self.model(for: tier)
+        guard !tier.isVideoOnly else {
+            return .unavailable(tier, model: model.modelName, reason: UpscaleTier.liveActionStillReason)
+        }
         guard service.packageID(for: model) != nil else {
             let why = service.outcome(for: model)?.failure ?? "registration has not run"
             return .unavailable(tier, model: model.modelName, reason: "\(model.modelName) is not registered — \(why)")
@@ -137,6 +148,8 @@ public final class EngineImageEnhancer: ImageEnhancer {
         /// The engine's memory governor refused the run at admission; carries its reason in the user's terms.
         case declined(ForgeModel, String)
         case unexpectedResponse(Capability)
+        /// A whole-clip video tier (`UpscaleTier.isVideoOnly`) asked of the per-frame enhancer.
+        case videoOnlyTier(UpscaleTier)
 
         public var description: String {
             switch self {
@@ -146,6 +159,8 @@ public final class EngineImageEnhancer: ImageEnhancer {
                 return "\(model.modelName) was declined by the engine's memory governor — \(why)"
             case .unexpectedResponse(let capability):
                 return "unexpected response from \(capability)"
+            case .videoOnlyTier:
+                return UpscaleTier.liveActionStillReason
             }
         }
     }
@@ -170,7 +185,7 @@ public final class EngineImageEnhancer: ImageEnhancer {
     static func gb(_ bytes: UInt64) -> String { String(format: "%.1f GB", Double(bytes) / 1e9) }
 }
 
-private extension UpscaleFactor {
+extension UpscaleFactor {
     /// Integer scale for the engine request; nil means "skip the upscale stage".
     var requestedScale: Int? {
         switch self {
