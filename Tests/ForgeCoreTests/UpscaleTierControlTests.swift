@@ -26,9 +26,10 @@ import MLXToolKit
         }
     }
 
-    /// HEART (the opt-in variant), VOSR2 (generative) and SeedVR2 stay off the control: exposing them is a product call.
+    /// HEART (the opt-in variant), VOSR2 and Nacre (generative) and SeedVR2 stay off the control: exposing them is a
+    /// product call.
     @Test func optInAndGenerativeTiersAreOffTheControl() {
-        for model in [ForgeModel.upscaleHEART, .upscaleGenerative, .upscaleQuality] {
+        for model in [ForgeModel.upscaleHEART, .upscaleGenerative, .upscaleNacre, .upscaleQuality] {
             #expect(EngineImageEnhancer.tier(for: model) == nil, "\(model.modelName) must not be reachable from Fast/Best")
         }
     }

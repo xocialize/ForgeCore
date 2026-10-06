@@ -1,5 +1,5 @@
 {
-  "originHash" : "3945ea045474875cf464fb84491e1da8d2a80b4ca2a2fc3a937a0cb5817066be",
+  "originHash" : "bbd469f6330d544fa8bbf6943284b6b79343f8d7ed07702f9f43b6ba5f6be1d3",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -215,6 +215,15 @@
       "state" : {
         "revision" : "386446a154628cf3b675dc8a8dc7a3efae852843",
         "version" : "0.2.0"
+      }
+    },
+    {
+      "identity" : "mlx-nacre-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/xocialize/mlx-nacre-swift.git",
+      "state" : {
+        "revision" : "855108c7c6b4027a27556f0f392b36a46ddf7df7",
+        "version" : "0.1.4"
       }
     },
     {

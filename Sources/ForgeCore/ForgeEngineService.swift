@@ -33,6 +33,7 @@ import MLXFlashVSR
 import MLXVOSR
 import MLXRealPLKSR
 import MLXHEART
+import MLXNacre
 import MLXBiRefNet
 import MLXSigLIP2IQA
 import MLXDDColor
@@ -56,11 +57,12 @@ let log = Logger(subsystem: "com.xocialize.ForgeCore", category: "ForgeCore")
 /// Every model package Forge registers. One case per registration, *not* per capability —
 /// Optimize alone uses two (restore + upscale), and one flow registration feeds four consumers.
 ///
-/// 🔑 **`upscale`, `upscaleFidelity`, `upscaleQuality`, `upscaleGenerative` and `upscaleHEART` are five registrations
-/// behind ONE capability**, which is the engine's multi-package-per-`PackageID` pattern and the first place Forge uses
-/// it: NERVE is the fast tier (2026-09-28, replacing Real-ESRGAN), RealPLKSR the fidelity tier (2026-09-28), SeedVR2-3B
-/// the quality tier, VOSR2 the generative stills tier (2026-09-26), HEART the opt-in fidelity variant (2026-09-29,
-/// reachable but never a default route), and the planner picks. Adding SeedVR2 does **not**
+/// 🔑 **`upscale`, `upscaleFidelity`, `upscaleQuality`, `upscaleGenerative`, `upscaleHEART` and `upscaleNacre` are six
+/// registrations behind ONE capability**, which is the engine's multi-package-per-`PackageID` pattern and the first place
+/// Forge uses it: NERVE is the fast tier (2026-09-28, replacing Real-ESRGAN), RealPLKSR the fidelity tier (2026-09-28),
+/// SeedVR2-3B the quality tier, VOSR2 the generative stills tier (2026-09-26), HEART the opt-in fidelity variant
+/// (2026-09-29) and Nacre the opt-in provenance-clean generative variant (2026-10-05) — the last two reachable but never
+/// a default route — and the planner picks. Adding SeedVR2 does **not**
 /// displace the fast tier — `MODEL-CATALOG.md`'s standing rule is that when SeedVR2 isn't viable (memory, chip,
 /// file) `videoUpscale` routes to the per-frame fast tier: *same tool, lighter backer.*
 ///
@@ -121,6 +123,21 @@ public enum ForgeModel: String, CaseIterable, Sendable {
     // the whole tensor, so its tiled output is NOT bit-equivalent to whole-frame (H5): the package defaults run whole
     // frames only up to 512² of input and 512/32 tiles above (fp16 peak 3.2 GB through 1080p → 8K).
     case upscaleHEART      // HEART .fidelity (fp16, mlx-community/HEART-fp16) — the opt-in fidelity VARIANT, not a default
+    // ── upscaleNacre (AB-A-0133) ──
+    // Registered 2026-10-05 as the OPT-IN provenance-clean GENERATIVE variant beside VOSR2 — reachable (`measureUpscale`,
+    // `EngineTextGuardedUpscaler(generative: .upscaleNacre)`, a host's own routing), never a default route. Nacre v1
+    // (`mlx-nacre-swift`): xocialize's own clean-room ResShift-class 4× SR — a 118.6 M SwinUNet driving a 4-step
+    // residual-shift diffusion in the CompVis VQ-f4 latent (MIT), Apache-2.0 code AND weights, trained only on Wikimedia
+    // Commons CC0/PD/CC BY images with every attribution resolved (AB-R-0396). The SIXTH `imageUpscale` backer. Why it
+    // exists beside VOSR2: VOSR2's ~100M-image corpus is undisclosed (shipped under posture A, AB-D-0105), so a caller
+    // that must show clean provenance end to end has no generative stills tier without this one. It is NOT the stronger
+    // model — VOSR2's paper numbers sit well above the ResShift class — but at parity with ResShift v3 on neutral sets
+    // (RealSR LPIPS 0.318 vs 0.364, MUSIQ 63.5 vs 59.3; behind on CLIPIQA by 0.03–0.04 on DIV2K/RealSet). Port e2e
+    // 131 dB CPU / 128 dB GPU vs the PyTorch reference (AB-R-0398). ⚠️ Generative: like VOSR2 it damages already-legible
+    // small text (SA-Text: ResShift-equivalent) — reach it through `EngineTextGuardedUpscaler`; no opt-in guard route is
+    // earned for this pair until `GuardedUpscaleLiveTests` measures it. Native ×4; a ×2 request is post-downsampled and
+    // `appliedScale` says so. Seeded (fixed by default), so a given image + configuration is reproducible.
+    case upscaleNacre      // Nacre v1 (fp16, xocialize/nacre-v1-mlx, tiled 128/32) — the opt-in provenance-clean GENERATIVE variant
     // ── upscaleVideoLiveAction (2026-10-04) ──
     // FlashVSR v1.1 (OpenImagingLab, Apache-2.0 code AND weights; `mlx-flashvsr-swift`): one-step streaming diffusion
     // video super-resolution — a Wan2.1-1.3B-shaped DiT with locality-constrained block-sparse attention (a Metal kernel
@@ -184,6 +201,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .upscaleGenerative: return "VOSR2"
         case .upscaleFidelity: return "RealPLKSR"
         case .upscaleHEART: return "HEART"
+        case .upscaleNacre: return "Nacre"
         case .upscaleVideoLiveAction: return "FlashVSR"
         case .matte:      return "BiRefNet"
         case .colorize:   return "DDColor"
@@ -222,6 +240,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .upscaleGenerative: return .imageUpscale
         case .upscaleFidelity: return .imageUpscale
         case .upscaleHEART: return .imageUpscale
+        case .upscaleNacre: return .imageUpscale
         case .upscaleVideoLiveAction: return .videoUpscale
         case .matte:      return .matting
         case .colorize:   return .imageColorize
@@ -598,6 +617,18 @@ public final class ForgeEngineService {
                 id = try await registerRecording(model, HEARTUpscalePackage.registration,
                                                         configuration: HEARTConfiguration(),
                                                         id: "heart-upscale")
+            case .upscaleNacre:
+                // Nacre (mlx-nacre-swift ≥ 0.1.4). Package defaults on purpose (the BRIDGE-067 discipline): the fp16 lane
+                // (every reduction held at fp32 inside, 58 dB vs fp32; the package's BudgetAware drops a requested fp32 to
+                // fp16 below its tile-aware floor), 128-px LQ tiles with 32 overlap — the in-app fastest AND better vs GT
+                // than whole-image (AB-R-0398 S3c) — and the fixed seed. The activation is declared PER TILE
+                // (`FootprintConfigured.peakActivationBytesHint`): fp16 0.40 GB resident + 5.40 GB at the default tile, on
+                // the in-app basis (AB-R-0399); the governor admits against that. The engine materializes only the fp16
+                // lane (xocialize/nacre-v1-mlx: nacre_v1 + vq_f4 + config.json, 348 MB) into its store on first prepare.
+                // Explicit id, equal to the manifest's surface name (AB-L-0160).
+                id = try await registerRecording(model, NacreUpscalePackage.registration,
+                                                        configuration: NacreConfiguration(),
+                                                        id: "nacre-upscale")
             case .upscaleVideoLiveAction:
                 // FlashVSR (mlx-flashvsr-swift ≥ 0.1.0). Package defaults on purpose (the BRIDGE-067 discipline): the bf16
                 // lane (inside the fp32 seed spread on every full-reference metric, half the memory), seed 0, upstream's

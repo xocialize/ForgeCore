@@ -2,6 +2,7 @@ import Testing
 import MLXToolKit
 import MLXNERVE
 import MLXHEART
+import MLXNacre
 @testable import ForgeCore
 
 /// AB-T-0184/0185: VOSR2 joins Real-ESRGAN and SeedVR2-3B as the THIRD `imageUpscale` registration — the generative
@@ -11,12 +12,14 @@ import MLXHEART
 /// AB-T-0186 Step 3: NERVE REPLACES Real-ESRGAN as `.upscale`, the fast tier — explicit PackageID `nerve-upscale`.
 /// AB-T-0189 / AB-A-0128: HEART is the FIFTH — the OPT-IN fidelity variant behind RealPLKSR (the crossover AB-R-0379 gave
 /// RealPLKSR DISTS at 12/12 rungs; the operator chose the opt-in slot), explicit PackageID `heart-upscale`, reachable but
-/// on no default route. Pinned so the tiers never collapse onto one registration (the Restormer lesson, AB-L-0160).
+/// on no default route. AB-A-0133: Nacre v1 is the SIXTH — the OPT-IN provenance-clean generative variant beside VOSR2,
+/// explicit PackageID `nacre-upscale`, reachable but on no default route. Pinned so the tiers never collapse onto one
+/// registration (the Restormer lesson, AB-L-0160).
 @Suite struct UpscaleTierTests {
     @Test func fastTierIsNERVE() {
         #expect(ForgeModel.upscale.capability == .imageUpscale)
         #expect(ForgeModel.upscale.modelName == "NERVE")
-        let siblings: [ForgeModel] = [.upscaleFidelity, .upscaleQuality, .upscaleGenerative, .upscaleHEART]
+        let siblings: [ForgeModel] = [.upscaleFidelity, .upscaleQuality, .upscaleGenerative, .upscaleHEART, .upscaleNacre]
         #expect(!siblings.map(\.modelName).contains(ForgeModel.upscale.modelName))
     }
 
@@ -50,16 +53,17 @@ import MLXHEART
     @Test func fidelityTierIsAFourthImageUpscaleRegistration() {
         #expect(ForgeModel.upscaleFidelity.capability == .imageUpscale)
         #expect(ForgeModel.upscaleFidelity.modelName == "RealPLKSR")
-        let siblings: [ForgeModel] = [.upscale, .upscaleQuality, .upscaleGenerative, .upscaleHEART]
+        let siblings: [ForgeModel] = [.upscale, .upscaleQuality, .upscaleGenerative, .upscaleHEART, .upscaleNacre]
         #expect(!siblings.map(\.rawValue).contains(ForgeModel.upscaleFidelity.rawValue))
         #expect(!siblings.map(\.modelName).contains(ForgeModel.upscaleFidelity.modelName))
         #expect(ForgeModel.allCases.contains(.upscaleFidelity))
     }
 
-    /// Exactly five stills backers behind `imageUpscale`, all reachable from the case list a host iterates.
-    @Test func imageUpscaleHasExactlyFiveBackers() {
+    /// Exactly six stills backers behind `imageUpscale`, all reachable from the case list a host iterates.
+    @Test func imageUpscaleHasExactlySixBackers() {
         let backers = ForgeModel.allCases.filter { $0.capability == .imageUpscale }
-        #expect(Set(backers) == Set([.upscale, .upscaleFidelity, .upscaleQuality, .upscaleGenerative, .upscaleHEART]))
+        #expect(Set(backers) == Set([.upscale, .upscaleFidelity, .upscaleQuality, .upscaleGenerative, .upscaleHEART,
+                                     .upscaleNacre]))
     }
 
     /// HEART is the opt-in fidelity VARIANT: its own case, name and id, behind `imageUpscale` — and on NO default route:
@@ -67,7 +71,7 @@ import MLXHEART
     @Test func heartIsTheOptInFidelityVariant() {
         #expect(ForgeModel.upscaleHEART.capability == .imageUpscale)
         #expect(ForgeModel.upscaleHEART.modelName == "HEART")
-        let siblings: [ForgeModel] = [.upscale, .upscaleFidelity, .upscaleQuality, .upscaleGenerative]
+        let siblings: [ForgeModel] = [.upscale, .upscaleFidelity, .upscaleQuality, .upscaleGenerative, .upscaleNacre]
         #expect(!siblings.map(\.rawValue).contains(ForgeModel.upscaleHEART.rawValue))
         #expect(!siblings.map(\.modelName).contains(ForgeModel.upscaleHEART.modelName))
         #expect(ForgeModel.upscaleFidelity.modelName == "RealPLKSR")
@@ -102,6 +106,46 @@ import MLXHEART
         }
     }
 
+    /// Nacre is the opt-in provenance-clean GENERATIVE variant: its own case, name and id, behind `imageUpscale` — and
+    /// VOSR2 stays `.upscaleGenerative`, the guard's default generative tier.
+    @Test func nacreIsTheOptInGenerativeVariant() {
+        #expect(ForgeModel.upscaleNacre.capability == .imageUpscale)
+        #expect(ForgeModel.upscaleNacre.modelName == "Nacre")
+        let siblings: [ForgeModel] = [.upscale, .upscaleFidelity, .upscaleQuality, .upscaleGenerative, .upscaleHEART]
+        #expect(!siblings.map(\.rawValue).contains(ForgeModel.upscaleNacre.rawValue))
+        #expect(!siblings.map(\.modelName).contains(ForgeModel.upscaleNacre.modelName))
+        #expect(ForgeModel.upscaleGenerative.modelName == "VOSR2")
+    }
+
+    /// Registration is offline (the engine materializes the 348 MB fp16 lane on first prepare, not here): Nacre must
+    /// clear `.permissiveOnly` + `.blocking` (Apache-2.0 weights and port) and land on its explicit id.
+    @Test @MainActor func nacreRegistersUnderItsExplicitID() async {
+        let service = ForgeEngineService()
+        await service.registerAll()
+        #expect(service.outcome(for: .upscaleNacre)?.failure == nil,
+                "Nacre did not register: \(service.outcome(for: .upscaleNacre)?.failure ?? "")")
+        #expect(service.packageID(for: .upscaleNacre)?.rawValue == "nacre-upscale")
+        #expect(service.packageID(for: .upscaleNacre) != service.packageID(for: .upscaleGenerative))
+    }
+
+    /// ForgeCore registers Nacre's package defaults; these are the defaults it relies on — the fp16 lane, the 128/32
+    /// tiling the in-app footprint was declared at (AB-R-0399), a fixed seed, and the shipping repo.
+    @Test func nacreDefaultsAreThePackages() {
+        let c = NacreConfiguration()
+        #expect(c.effectiveQuant == .fp16)
+        #expect(c.tileSize == nil && c.tileOverlap == nil)   // nil = the package's measured 128/32
+        #expect(NacreConfiguration.repo == "xocialize/nacre-v1-mlx")
+        #expect(c.peakActivationBytesHint == NacreConfiguration.declaredActivationBytes(quant: .fp16, tile: 128))
+    }
+
+    /// Opt-in means no default route lists it: Optimize's tier list is unchanged by the sixth backer.
+    @Test @MainActor func nacreIsOnNoDefaultRoute() {
+        let caps = ForgeCapabilities(service: ForgeEngineService())   // no registerAll — construction only
+        for tier in caps.qualityTierAvailability {
+            #expect(!tier.models.contains(.upscaleNacre), "\(tier.capability) lists the opt-in generative variant")
+        }
+    }
+
     /// Registration runs the license and device gates only — the weights are vendored and load on the first `run` —
     /// so this stays offline. RealPLKSR must clear `.permissiveOnly` + `.blocking` (Apache-2.0 weights and port) and
     /// land on its explicit id, which is the id a UI binds and a receipt names.
@@ -122,7 +166,7 @@ import MLXHEART
         #expect(optimize?.models == [.restore, .upscale, .upscaleFidelity, .upscaleVideoLiveAction])
     }
 
-    /// The guard adapter accepts either generative tier (it is main-actor isolated, like the service it wraps).
+    /// The guard adapter accepts any generative tier (it is main-actor isolated, like the service it wraps).
     @Test @MainActor func guardAdapterTakesEitherGenerativeTier() async {
         let service = ForgeEngineService()   // no registerAll — construction only
         let a = EngineTextGuardedUpscaler(service: service, generative: .upscaleGenerative)
@@ -131,5 +175,21 @@ import MLXHEART
         #expect(b.generative == .upscaleGenerative)   // VOSR2 is the default generative tier since v0.23.0 (§11.2)
         let c = EngineTextGuardedUpscaler(service: service, generative: .upscaleQuality)
         #expect(c.generative == .upscaleQuality)
+        let d = EngineTextGuardedUpscaler(service: service, generative: .upscaleNacre)   // the provenance-clean choice
+        #expect(d.generative == .upscaleNacre && d.base == .upscale)
+    }
+
+    /// The guard's default policy is the one each pair EARNED: Nacre word protection on (generative best in none of four
+    /// measured cells), everything else MaskKit's all-opt-in default — and an explicit policy always wins.
+    @Test @MainActor func guardDefaultsToEachPairsMeasuredPolicy() {
+        let service = ForgeEngineService()   // no registerAll — construction only
+        let nacre = EngineTextGuardedUpscaler(service: service, generative: .upscaleNacre)
+        #expect(nacre.policy.wordProtection && !nacre.policy.documentGate)
+        for tier in [ForgeModel.upscaleGenerative, .upscaleQuality] {
+            let p = EngineTextGuardedUpscaler(service: service, generative: tier).policy
+            #expect(!p.wordProtection && !p.documentGate, "\(tier.modelName) has earned no opt-in route")
+        }
+        let raw = EngineTextGuardedUpscaler(service: service, policy: .default, generative: .upscaleNacre)
+        #expect(!raw.policy.wordProtection && !raw.policy.documentGate)
     }
 }

@@ -35,8 +35,8 @@ public final class EngineImageEnhancer: ImageEnhancer {
     /// The one registration each tier runs, and the only one: `.fast` → NERVE (`.upscale`), `.best` → RealPLKSR
     /// (`.upscaleFidelity`). The routing axis is cost — RealPLKSR beat the previous fast tier at all 12 degradation
     /// rungs (AB-R-0285) at ~5× NERVE's wall time (0.75 s vs 3.7 s at 1080p ×4, M5 Max) — so no classifier picks it.
-    /// HEART (`.upscaleHEART`) and VOSR2 (`.upscaleGenerative`) are deliberately off this map: exposing them is a
-    /// product call, and both stay reachable through `measureUpscale` and a host's own routing.
+    /// HEART (`.upscaleHEART`), VOSR2 (`.upscaleGenerative`) and Nacre (`.upscaleNacre`) are deliberately off this map:
+    /// exposing them is a product call, and all three stay reachable through `measureUpscale` and a host's own routing.
     ///
     /// `.liveAction` maps to FlashVSR (`.upscaleVideoLiveAction`) so the receipt mapping covers every tier, but this
     /// enhancer never runs it: it is a whole-clip video tier served by `EngineVideoUpscaler`, and a still asked for it

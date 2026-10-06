@@ -2,8 +2,9 @@
 //  EngineTextGuardedUpscaler.swift
 //  ForgeCore
 //
-//  MaskKit's `TextLegibilityGuard` in front of a GENERATIVE stills upscale tier — `.upscaleQuality` (SeedVR2-3B)
-//  or `.upscaleGenerative` (VOSR2, registered 2026-09-26; AB-T-0184/0185) — chosen per instance by `generative:`.
+//  MaskKit's `TextLegibilityGuard` in front of a GENERATIVE stills upscale tier — `.upscaleQuality` (SeedVR2-3B),
+//  `.upscaleGenerative` (VOSR2, registered 2026-09-26; AB-T-0184/0185) or `.upscaleNacre` (Nacre v1, the provenance-clean
+//  variant, registered 2026-10-05; AB-A-0133) — chosen per instance by `generative:`.
 //
 //  Why (VOSR-EVAL §10–§11, 2026-09-26): a generative upscaler fixes more wrong words than it breaks, but turns
 //  ~10 % of the words the input already reads with certainty into plausible wrong words ("Mummie" → "Manunie").
@@ -28,6 +29,17 @@
 //  test is the harness). The ×1 letter-rewrite hazard (AB-L-0172) is real but was measured against the un-restored
 //  input as the base, which this adapter's base tier is not — ×1 stays unmeasured.
 //  VOSR2 is the default generative tier since v0.23.0: it reads at least as well and runs ~2× faster at ×4.
+//
+//  🔑 **Nacre is the first pair to EARN an opt-in route** (2026-10-05, AB-A-0133; NERVE base; pages 010 / 095 — page 090
+//  is not in the local fixtures; input reads 0.937 / 0.116):
+//    ×2   generative 0.820 / 0.551   keepBase 0.894 / 0.597   protectWords 0.894 / 0.572
+//    ×4   generative 0.816 / 0.521   keepBase 0.876 / 0.488   protectWords 0.876 / 0.571
+//  The generative route is best in NONE of the four cells. Nacre rewrites words the input already reads ("houses" →
+//  "bouses", "she" → "lhe") and lifts the paper white (p95 225 vs the HR page's 214), where VOSR2 holds both.
+//  protectWords never loses to generative (+0.021 … +0.074) and has the best worst case (0.571); the document gate
+//  adds a win on 095 ×2 but loses 095 ×4 (0.488). So `measuredPolicy(for: .upscaleNacre)` turns word protection ON
+//  and leaves the document gate off, and that is the policy a Nacre guard gets unless the caller passes one. The
+//  base routes reproduced the 2026-09-29 NERVE receipts exactly (0.894 / 0.597 ×2, 0.876 / 0.488 ×4).
 //
 //  Three routes, decided on the INPUT before any model runs:
 //    .generative    — the default → the generative tier alone;
@@ -71,11 +83,13 @@ public final class EngineTextGuardedUpscaler {
 
     private let service: ForgeEngineService
     /// The guard's policy — MaskKit's defaults route `.generative` for everything; `documentGate` and
-    /// `wordProtection` are opt-in per measured tier pair.
+    /// `wordProtection` are opt-in per measured tier pair. Defaults to `measuredPolicy(for: generative)` at init.
+    /// It does not follow later changes to `generative`.
     public var policy: TextLegibilityGuard.Policy
     /// The generative tier: `.upscaleGenerative` (VOSR2, the default since v0.23.0 — measured through this adapter
-    /// at ×2 and ×4, VOSR-EVAL §11.2) or `.upscaleQuality` (SeedVR2-3B). The routes a tier pair earns are decided by
-    /// `GuardedUpscaleLiveTests` + the OCR check, never assumed from another pair.
+    /// at ×2 and ×4, VOSR-EVAL §11.2), `.upscaleQuality` (SeedVR2-3B) or `.upscaleNacre` (Nacre, the provenance-clean
+    /// choice). The routes a tier pair earns are decided by `GuardedUpscaleLiveTests` + the OCR check, never assumed
+    /// from another pair.
     public var generative: ForgeModel
     /// The non-generative tier the protected words come from — the fast tier (`.upscale`: NERVE since 2026-09-28,
     /// Real-ESRGAN in the 2026-09-26 route measurements above): feed-forward, deterministic — "conservative
@@ -84,13 +98,31 @@ public final class EngineTextGuardedUpscaler {
     /// `GuardedUpscaleLiveTests` before trusting any opt-in route with it.
     public var base: ForgeModel
 
+    /// The policy a tier pair has EARNED through this adapter (`GuardedUpscaleLiveTests` + the OCR check, NERVE as the
+    /// base). Every pair gets MaskKit's all-opt-in `.default` except the measured exceptions:
+    ///   • `.upscaleNacre` — word protection ON, document gate off: the generative route was best in none of the four
+    ///     measured cells, and protectWords never lost to it (2026-10-05, header table).
+    /// A pair not listed here has earned nothing beyond the default — measure it before adding a case.
+    public static func measuredPolicy(for generative: ForgeModel) -> TextLegibilityGuard.Policy {
+        switch generative {
+        case .upscaleNacre:
+            var policy = TextLegibilityGuard.Policy.default
+            policy.wordProtection = true
+            return policy
+        default:
+            return .default
+        }
+    }
+
+    /// - Parameter policy: `nil` (the default) takes `measuredPolicy(for: generative)`; pass `.default` to force
+    ///   MaskKit's all-opt-in policy (the raw generative route) for any tier.
     public init(service: ForgeEngineService,
-                policy: TextLegibilityGuard.Policy = .default,
+                policy: TextLegibilityGuard.Policy? = nil,
                 generative: ForgeModel = .upscaleGenerative,
                 base: ForgeModel = .upscale) {
         precondition(generative.capability == .imageUpscale && base.capability == .imageUpscale)
         self.service = service
-        self.policy = policy
+        self.policy = policy ?? Self.measuredPolicy(for: generative)
         self.generative = generative
         self.base = base
     }

@@ -85,6 +85,13 @@ let package = Package(
         // route: the crossover (AB-T-0190) gave RealPLKSR DISTS at 12/12 rungs, HEART PSNR at 12/12 and a SSIMULACRA2 tie,
         // at 4.5–5× the cost, and the operator chose the opt-in slot (AB-A-0128). Public since 2026-09-28.
         .package(url: "https://github.com/xocialize/mlx-heart-swift.git", from: "0.1.0"),
+        // Nacre v1 (AB-A-0133) — the OPT-IN provenance-clean GENERATIVE variant beside VOSR2: our own clean-room
+        // ResShift-class 4× SR (118.6 M SwinUNet + 4-step residual shift in CompVis VQ-f4's latent, Apache-2.0 code AND
+        // weights, trained only on Wikimedia Commons CC0/PD/CC BY; AB-R-0396). VOSR2's corpus is undisclosed (AB-D-0105);
+        // Nacre's case is provenance, not peak quality. Registered as `.upscaleNacre` — reachable, never a default route.
+        // Weights materialize from xocialize/nacre-v1-mlx (fp16 lane 348 MB). 0.1.4 = the in-app footprint declared per
+        // tile (AB-R-0399); 0.1.2/0.1.3 under-declare and 0.1.0/0.1.1 carry the CLI split. Public since 2026-10-05.
+        .package(url: "https://github.com/xocialize/mlx-nacre-swift.git", from: "0.1.4"),
         // FlashVSR v1.1 — the LIVE-ACTION generative tier behind `videoUpscale` (registered 2026-10-04): one-step streaming
         // diffusion VSR (OpenImagingLab, Apache-2.0 code AND weights), ported to Swift/MLX with a Metal block-sparse attention
         // kernel; weights materialize from mlx-community/FlashVSR-v1.1-bf16 (3.5 GB). ⚠️ Generative: it renders anime and
@@ -143,6 +150,7 @@ let package = Package(
                 .product(name: "MLXVOSR", package: "mlx-vosr-swift"),
                 .product(name: "MLXRealPLKSR", package: "mlx-realplksr-swift"),
                 .product(name: "MLXHEART", package: "mlx-heart-swift"),
+                .product(name: "MLXNacre", package: "mlx-nacre-swift"),
                 .product(name: "MLXFlashVSR", package: "mlx-flashvsr-swift"),
                 .product(name: "MLXBiRefNet", package: "mlx-birefnet-swift"),
                 .product(name: "MLXSigLIP2IQA", package: "mlx-siglip2-iqa-swift"),
@@ -161,6 +169,7 @@ let package = Package(
             "ForgeCore",
             .product(name: "MLXNERVE", package: "mlx-nerve-swift"),   // UpscaleTierTests pins the defaults ForgeCore registers
             .product(name: "MLXHEART", package: "mlx-heart-swift"),   // … and HEART's (the opt-in variant)
+            .product(name: "MLXNacre", package: "mlx-nacre-swift"),   // … and Nacre's (the opt-in generative variant)
             .product(name: "MLXFlashVSR", package: "mlx-flashvsr-swift"), // … and FlashVSR's (the live-action video tier)
         ]),
     ]

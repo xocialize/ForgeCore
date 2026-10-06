@@ -7,7 +7,7 @@
 //  SeedVR2 snapshot and real pages), so it never runs in CI:
 //
 //      FORGE_GUARD_E2E_DIR=<dir of PNGs> FORGE_GUARD_E2E_OUT=<dir> [FORGE_GUARD_E2E_SCALE=2] \
-//        [FORGE_GUARD_E2E_GENERATIVE=upscaleQuality|upscaleGenerative] \
+//        [FORGE_GUARD_E2E_GENERATIVE=upscaleQuality|upscaleGenerative|upscaleNacre] [FORGE_GUARD_E2E_STORE=<dir>] \
 //        swift test --build-system swiftbuild --filter GuardedUpscaleLiveTests
 //
 //  Pass 1 runs the default policy (every route opt-in → generative) and asserts only the generative tier ran.
@@ -18,7 +18,9 @@
 //  for a tier pair: 2026-09-26, SeedVR2-3B ×2, VOSR2 ×2, VOSR2 ×4 and SeedVR2-3B ×4, each with Real-ESRGAN as the
 //  base, three ScreenSR pages — the generative route read best on every page in every run (VOSR-EVAL §11.1–§11.2);
 //  2026-09-29, VOSR2 ×2 and ×4 with NERVE as the base — best in 5 of 6 cells, the sixth a 0.010 edge on the sparse
-//  page (§11.3). No opt-in route has been earned by any pair.
+//  page (§11.3). No opt-in route had been earned by any pair until 2026-10-05: Nacre ×2 and ×4 with NERVE as the base,
+//  pages 010 / 095 — generative best in none of four cells, protectWords never below it, so the Nacre pair earns word
+//  protection (`EngineTextGuardedUpscaler.measuredPolicy(for:)`; the table is in that file's header).
 //
 
 import Testing
@@ -67,8 +69,9 @@ import MaskKit
             let name = file.deletingPathExtension().lastPathComponent
             let image = try #require(Self.loadPNG(file), "could not decode \(file.lastPathComponent)")
 
-            // Pass 1 — the defaults: every route is opt-in, so the generative tier alone.
-            let guarded = EngineTextGuardedUpscaler(service: service, generative: generative)
+            // Pass 1 — MaskKit's defaults, passed explicitly: every route is opt-in, so the generative tier alone. (The
+            // adapter's own default is `measuredPolicy(for:)`, which for Nacre already opts into word protection.)
+            let guarded = EngineTextGuardedUpscaler(service: service, policy: .default, generative: generative)
             let out = try await guarded.upscale(image, scale: scale)
             #expect(out.image.width == image.width * scale && out.image.height == image.height * scale,
                     "\(name): output \(out.image.width)×\(out.image.height) for ×\(scale) of \(image.width)×\(image.height)")
