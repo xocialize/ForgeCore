@@ -1,5 +1,5 @@
 {
-  "originHash" : "e2492115b689cbb8510871ca244bc51b7156477ae576dbc67053897de9a6b429",
+  "originHash" : "3634e97ad74b7ff6f43e31fa423bc97414cce6e53749f2a2b1abe828a264214d",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -173,6 +173,15 @@
       }
     },
     {
+      "identity" : "mlx-exact-conv-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/xocialize/mlx-exact-conv-swift",
+      "state" : {
+        "revision" : "26096a792c0c32eda48eb97bc4dadd56dc5c7cc0",
+        "version" : "0.1.0"
+      }
+    },
+    {
       "identity" : "mlx-flashvsr-swift",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-flashvsr-swift.git",
@@ -186,8 +195,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-gfpgan-swift.git",
       "state" : {
-        "revision" : "c8582091242c1ae8ab7a5f876c3023d9e13df040",
-        "version" : "0.1.0"
+        "revision" : "1058a0b2cd450a63dc37a1e2e66738c6e9410f1d",
+        "version" : "0.2.0"
       }
     },
     {
@@ -204,8 +213,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-lama-swift.git",
       "state" : {
-        "revision" : "386446a154628cf3b675dc8a8dc7a3efae852843",
-        "version" : "0.2.0"
+        "revision" : "8dedf62bd5661d5c87619ed258834329d8f46435",
+        "version" : "0.3.0"
       }
     },
     {
@@ -267,8 +276,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-restoreformer-swift.git",
       "state" : {
-        "revision" : "ba5c39b03e91c9c648922c4397b9652dc9ce9a18",
-        "version" : "0.1.0"
+        "revision" : "6c4c347a5ed54bf6ad43d420879fabf69db74aeb",
+        "version" : "0.2.0"
       }
     },
     {
@@ -330,8 +339,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/ml-explore/mlx-swift.git",
       "state" : {
-        "revision" : "0bb916c67f4b9e5c682cbe02a42c701c93ab5021",
-        "version" : "0.31.6"
+        "revision" : "19601207e9a0de51e03ee6ec0c3c5f3784275075",
+        "version" : "0.32.3"
       }
     },
     {
@@ -348,8 +357,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-vosr-swift.git",
       "state" : {
-        "revision" : "195ac378ff0834c42b19c48fa243aed761718abc",
-        "version" : "0.1.0"
+        "revision" : "acb96ab829ff0162d0b2292c222297068e7c7a33",
+        "version" : "0.2.0"
       }
     },
     {

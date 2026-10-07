@@ -63,8 +63,12 @@ let package = Package(
         .package(url: "https://github.com/xocialize/mlx-drunet-swift.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/mlx-scunet-swift.git", from: "0.1.1"),
         .package(url: "https://github.com/xocialize/mlx-cidnet-swift.git", from: "0.1.0"),
-        .package(url: "https://github.com/xocialize/mlx-gfpgan-swift.git", from: "0.1.0"),
-        .package(url: "https://github.com/xocialize/mlx-restoreformer-swift.git", from: "0.1.0"),
+        // Face pair floors = the MLXExactConv releases (AB-A-0119, 2026-10-07). mlx's GPU Winograd conv2d is lossy on
+        // in-window 3×3 convs; 0.1.1 routed around it through conv3d, which mlx-swift 0.32 defeats again (gfpgan's lane
+        // fails at 1.01e-3 there). 0.2.0 routes through MLXExactConv — exact on 0.31.x and 0.32.x (7.5e-7) — and the
+        // app ships 0.32.3, so nothing below 0.2.0 may resolve (`wave-0.32-approval-batch.md` §B).
+        .package(url: "https://github.com/xocialize/mlx-gfpgan-swift.git", from: "0.2.0"),
+        .package(url: "https://github.com/xocialize/mlx-restoreformer-swift.git", from: "0.2.0"),
         .package(url: "https://github.com/xocialize/mlx-bopbtl-swift.git", from: "0.2.0"),
         // Category A Kit — RestoreTier2 is the provider-protocol seam this package implements
         // (BRIDGE-070). One-way: the Kit never depends back on ForgeCore.
@@ -81,7 +85,9 @@ let package = Package(
     .package(url: "https://github.com/xocialize/mlx-seedvr2-swift.git", from: "0.10.0"),
         // The GENERATIVE stills tier behind `imageUpscale` — VOSR2 (AB-T-0184/AB-T-0185): a third backer, beside
         // the fast tier (Real-ESRGAN then, NERVE since 2026-09-28) and SeedVR2 (quality/diffusion), never a replacement.
-        .package(url: "https://github.com/xocialize/mlx-vosr-swift.git", from: "0.1.0"),
+        // 0.2.0 = in-window convs through MLXExactConv (exact on mlx-swift 0.31.x and 0.32.x); 0.1.0 predates the
+        // Winograd fix entirely, and VOSR2 is Optimize's Generative tier since 2026-10-07 (AB-A-0119 follow-through).
+        .package(url: "https://github.com/xocialize/mlx-vosr-swift.git", from: "0.2.0"),
         // The FIDELITY stills tier behind `imageUpscale` — RealPLKSR `4x_webphoto_realplksr` (AB-T-0186 Step 1): a fourth
         // backer, ours end to end (trained on the Commons-SR corpus, weights vendored in the package — no download).
         // Public since 2026-09-28, which keeps this manifest's whole closure public for CI. 0.1.1 = the in-app
@@ -119,7 +125,9 @@ let package = Package(
         // progress; a pre-0.4.0 `<store>/SigLIP2/` copy is adopted by move, a store-less cache copy is re-materialized.
         .package(url: "https://github.com/xocialize/mlx-siglip2-iqa-swift.git", from: "0.4.0"),
         .package(url: "https://github.com/xocialize/mlx-ddcolor-swift.git", from: "0.2.0"),
-        .package(url: "https://github.com/xocialize/mlx-lama-swift.git", from: "0.2.0"),
+        // 0.3.0 = LaMa's FFC convs through MLXExactConv, exact on mlx-swift 0.31.x AND 0.32.x. 0.2.1's conv3d route
+        // (the AB-A-0119 Winograd fix) is defeated on 0.32, which the app ships (`wave-0.32-approval-batch.md` §B).
+        .package(url: "https://github.com/xocialize/mlx-lama-swift.git", from: "0.3.0"),
         .package(url: "https://github.com/xocialize/mlx-sea-raft-swift.git", from: "0.5.0"),
         .package(url: "https://github.com/xocialize/mlx-edgetam-swift.git", from: "0.6.0"),
         // frameInterpolate — RIFE 4.25 (AB-T-0038). Ported and parity-locked 2026-06-18, but no
