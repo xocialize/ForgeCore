@@ -1,5 +1,5 @@
 {
-  "originHash" : "bbd469f6330d544fa8bbf6943284b6b79343f8d7ed07702f9f43b6ba5f6be1d3",
+  "originHash" : "8cc0f12766402d0d1ce208f3b4a1784c833d762f8b6e47a66dc74221f1ab636e",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -170,15 +170,6 @@
       "state" : {
         "revision" : "133b6b176913142274211c346f9ba5642ea43c64",
         "version" : "0.63.0"
-      }
-    },
-    {
-      "identity" : "mlx-fftformer-swift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/xocialize/mlx-fftformer-swift.git",
-      "state" : {
-        "revision" : "9385513c5d54e3f9ea818ad750b6439a2edceadd",
-        "version" : "0.1.1"
       }
     },
     {

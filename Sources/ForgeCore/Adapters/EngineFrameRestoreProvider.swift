@@ -24,7 +24,8 @@
 //    scored through the same alignment: Restormer **+1.29 ± 0.13 dB**, 95% of images improved, worst
 //    case −0.69 dB. FFTformer GoPro, this job's backer until AB-T-0180: **−0.02 ± 0.22 dB**, 41% of
 //    images hurt (18% by more than 1 dB), worst case −18.70 dB. A default has to be safe on the tail.
-//    FFTformer stays registered (`.deblurMotion`) as an explicit, non-default choice.
+//    FFTformer was kept registered (`.deblurMotion`) as an explicit choice until 2026-10-06, then unregistered
+//    (AB-D-0111): an option measured worse than doing nothing is not one to offer.
 //    ⚠️ Both are GoPro-trained, and FFTformer WINS GoPro (34.21 vs 32.92): the ranking inverts on real
 //    blur, so a GoPro score is not evidence for this table. The comment this replaces said C2 found
 //    every GoPro-trained method below the blurry input — that was the *Deblurring in the Wild* premise

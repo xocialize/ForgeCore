@@ -106,9 +106,11 @@ struct EngineImageCodingTests {
         #expect(ForgeModel.upscaleQuality.capability == .imageUpscale)
         #expect(ForgeModel.upscaleGenerative.capability == .imageUpscale)
         #expect(ForgeModel.upscaleFidelity.capability == .imageUpscale)
-        // The BRIDGE-066 wave: eight imageRestore backers total (NAFNet + wave + faces), one relight.
+        // The BRIDGE-066 wave: the imageRestore backers are NAFNet + the wave + the face pair, one relight. Pinned as a SET
+        // (a bare count drifted from its own comment); FFTformer left it 2026-10-06, unregistered by AB-D-0111.
         let restoreBackers = models.filter { $0.capability == .imageRestore }
-        #expect(restoreBackers.count == 9)
+        #expect(Set(restoreBackers) == [.restore, .restormerMotion, .restormerDefocus, .restormerDenoise,
+                                        .denoiseStrength, .denoiseBlind, .faceRestore, .faceRestoreVQ])
         #expect(ForgeModel.relight.capability == .imageRelight)
         #expect(ForgeModel.defectDetect.capability == .defectDetect)
         // Restormer is ONE package, THREE registrations — distinct cases, distinct display names.

@@ -21,9 +21,9 @@ struct RestoreRoutingTests {
         #expect(EngineFrameRestoreProvider.routing[.motionDeblur]?.modelName == "Restormer (motion)")
     }
 
-    /// FFTformer stays registered as an explicit choice, but no job reaches it by default.
-    @Test func fftformerIsNotADefaultRoute() {
-        #expect(!EngineFrameRestoreProvider.routing.values.contains(.deblurMotion))
+    /// FFTformer is unregistered (AB-D-0111, 2026-10-06): no ForgeModel case names it, so no route can reach it.
+    @Test func fftformerIsNotRegistered() {
+        #expect(!ForgeModel.allCases.map(\.modelName).contains("FFTformer"))
     }
 
     @Test func tableIsPinned() {

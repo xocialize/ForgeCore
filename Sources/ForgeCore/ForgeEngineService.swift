@@ -19,7 +19,6 @@ import OSLog
 import MLXServeCore
 import MLXToolKit
 import MLXNAFNet
-import MLXFFTformer
 import MLXRestormer
 import MLXDRUNet
 import MLXSCUNet
@@ -166,7 +165,8 @@ public enum ForgeModel: String, CaseIterable, Sendable {
     // sixteen — every case below was a shipped, parity-gated package invisible to every app.
     // ⚠️ NONE of these change a default: NAFNet `.signage` remains the restore chain's backer
     // until BRIDGE-069 measures the head-to-head. Registration makes them REACHABLE, not chosen.
-    case deblurMotion      // FFTformer (fp32 — bf16 measured 30 dB of dtype error; ships fp32). Registered, NOT a default route: −0.02 dB on real blur (C2, AB-T-0180)
+    // FFTformer (`.deblurMotion`) was registered here until 2026-10-06 and is now UNREGISTERED (AB-D-0111): −0.02 dB on
+    // real blur with 41 % of images hurt (C2, AB-T-0180), so no route ever reached it and none should.
     case restormerMotion   // Restormer .motionDeblur — the `motionDeblur` route (C2: +1.29 dB on real blur)
     case restormerDefocus  // Restormer .defocusDeblur — the only shippable defocus deblur (C4)
     case restormerDenoise  // Restormer .realDenoise
@@ -210,7 +210,6 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .promptMask: return "EdgeTAM"
         case .promptMaskQuality: return "SAM 2.1"
         case .qualityScore: return "SigLIP2-IQA"
-        case .deblurMotion:     return "FFTformer"
         case .restormerMotion:  return "Restormer (motion)"
         case .restormerDefocus: return "Restormer (defocus)"
         case .restormerDenoise: return "Restormer (denoise)"
@@ -249,7 +248,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .promptMask: return .promptSegment
         case .promptMaskQuality: return .promptSegment
         case .qualityScore: return .imageQualityScore
-        case .deblurMotion, .restormerMotion, .restormerDefocus, .restormerDenoise,
+        case .restormerMotion, .restormerDefocus, .restormerDenoise,
              .denoiseStrength, .denoiseBlind, .faceRestore, .faceRestoreVQ:
             return .imageRestore
         case .relight: return .imageRelight
@@ -643,9 +642,6 @@ public final class ForgeEngineService {
             case .matte:
                 id = try await registerRecording(model, BiRefNetPackage.registration,
                                                         configuration: BiRefNetConfiguration())
-            case .deblurMotion:
-                id = try await registerRecording(model, FFTformerRestorePackage.registration,
-                                                        configuration: FFTformerConfiguration())
             // Restormer: ONE package, THREE registrations — the variant is a Configuration knob, so
             // each behaviour needs its own PackageID to be individually reachable/preparable
             // (BRIDGE-066 asked that the mechanism be recorded: it is per-registration config,

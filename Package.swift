@@ -52,7 +52,9 @@ let package = Package(
         .package(url: "https://github.com/xocialize/mlx-nafnet-swift.git", from: "0.4.0"),
         // The frame-restore wave (BRIDGE-066) + face pair (064-face) + relight (BRIDGE-067) —
         // registered 2026-07-31, ending the state where shipped packages were invisible to apps.
-        .package(url: "https://github.com/xocialize/mlx-fftformer-swift.git", from: "0.1.1"),
+        // FFTformer (`mlx-fftformer-swift`) was in this wave and was UNREGISTERED 2026-10-06 (AB-D-0111): worse than
+        // doing nothing on real blur (−0.02 ± 0.22 dB on RealBlur-J, 41 % of images hurt, worst −18.70 dB; AB-R-0331),
+        // with Restormer `.motionDeblur` the measured default. The package stays published for anyone who wants GoPro.
         .package(url: "https://github.com/xocialize/mlx-restormer-swift.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/mlx-drunet-swift.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/mlx-scunet-swift.git", from: "0.1.1"),
@@ -136,7 +138,6 @@ let package = Package(
                 .product(name: "MLXServeCore", package: "mlx-engine-swift"),
                 .product(name: "MLXToolKit", package: "mlx-engine-swift"),
                 .product(name: "MLXNAFNet", package: "mlx-nafnet-swift"),
-                .product(name: "MLXFFTformer", package: "mlx-fftformer-swift"),
                 .product(name: "MLXRestormer", package: "mlx-restormer-swift"),
                 .product(name: "MLXDRUNet", package: "mlx-drunet-swift"),
                 .product(name: "MLXSCUNet", package: "mlx-scunet-swift"),
