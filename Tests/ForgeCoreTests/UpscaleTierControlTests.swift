@@ -26,10 +26,37 @@ import MLXToolKit
         }
     }
 
-    /// HEART (the opt-in variant), VOSR2 and Nacre (generative) and SeedVR2 stay off the control: exposing them is a
-    /// product call.
+    /// The Generative tiers (AB-D-0111): `.generative` runs VOSR2, `.generativeClean` runs Nacre, and each maps back.
+    @Test func generativeRunsVOSR2AndGenerativeCleanRunsNacre() {
+        #expect(EngineImageEnhancer.model(for: .generative) == .upscaleGenerative)
+        #expect(EngineImageEnhancer.model(for: .generativeClean) == .upscaleNacre)
+        #expect(EngineImageEnhancer.tier(for: .upscaleGenerative) == .generative)
+        #expect(EngineImageEnhancer.tier(for: .upscaleNacre) == .generativeClean)
+    }
+
+    /// A composite never ships under one name: the guard's route decides what the receipt calls the pixels.
+    @Test func guardedResultsAreNamedByWhatMadeThePixels() {
+        #expect(EngineImageEnhancer.guardedModelName(generative: .upscaleNacre, base: .upscale, route: .generative) == "Nacre")
+        #expect(EngineImageEnhancer.guardedModelName(generative: .upscaleNacre, base: .upscale, route: .protectWords)
+                == "Nacre + NERVE (protected words)")
+        #expect(EngineImageEnhancer.guardedModelName(generative: .upscaleGenerative, base: .upscale, route: .keepBase)
+                == "NERVE (legible document kept)")
+    }
+
+    /// Before registration both Generative tiers are unavailable with the registration reason — nothing stands in.
+    @Test func unregisteredGenerativeTiersAreUnavailableWithTheReason() async {
+        let enhancer = EngineImageEnhancer(service: ForgeEngineService())
+        for tier in [UpscaleTier.generative, .generativeClean] {
+            let verdict = await enhancer.availability(of: tier)
+            #expect(!verdict.isAvailable)
+            #expect(verdict.model == EngineImageEnhancer.model(for: tier).modelName)
+            #expect(verdict.unavailableReason?.contains("is not registered") == true, "\(verdict)")
+        }
+    }
+
+    /// HEART (the opt-in variant) and SeedVR2 stay off the control: exposing them is a product call.
     @Test func optInAndGenerativeTiersAreOffTheControl() {
-        for model in [ForgeModel.upscaleHEART, .upscaleGenerative, .upscaleNacre, .upscaleQuality] {
+        for model in [ForgeModel.upscaleHEART, .upscaleQuality] {
             #expect(EngineImageEnhancer.tier(for: model) == nil, "\(model.modelName) must not be reachable from Fast/Best")
         }
     }

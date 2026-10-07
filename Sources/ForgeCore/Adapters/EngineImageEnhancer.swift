@@ -11,6 +11,7 @@ import Foundation
 import CoreGraphics
 import OSLog
 import ForgeOptimizerKit
+import MaskKit
 import MLXServeCore
 import MLXToolKit
 
@@ -35,8 +36,10 @@ public final class EngineImageEnhancer: ImageEnhancer {
     /// The one registration each tier runs, and the only one: `.fast` → NERVE (`.upscale`), `.best` → RealPLKSR
     /// (`.upscaleFidelity`). The routing axis is cost — RealPLKSR beat the previous fast tier at all 12 degradation
     /// rungs (AB-R-0285) at ~5× NERVE's wall time (0.75 s vs 3.7 s at 1080p ×4, M5 Max) — so no classifier picks it.
-    /// HEART (`.upscaleHEART`), VOSR2 (`.upscaleGenerative`) and Nacre (`.upscaleNacre`) are deliberately off this map:
-    /// exposing them is a product call, and all three stay reachable through `measureUpscale` and a host's own routing.
+    /// The generative stills tiers (AB-D-0111, 0.33.0): `.generative` → VOSR2 (`.upscaleGenerative`), `.generativeClean` →
+    /// Nacre (`.upscaleNacre`), each run behind `EngineTextGuardedUpscaler` with the policy its pair earned
+    /// (`measuredPolicy(for:)`). HEART (`.upscaleHEART`) stays off this map: its opt-in slot is reachable through
+    /// `measureUpscale` and a host's own routing (AB-A-0128).
     ///
     /// `.liveAction` maps to FlashVSR (`.upscaleVideoLiveAction`) so the receipt mapping covers every tier, but this
     /// enhancer never runs it: it is a whole-clip video tier served by `EngineVideoUpscaler`, and a still asked for it
@@ -46,6 +49,8 @@ public final class EngineImageEnhancer: ImageEnhancer {
         case .fast: return .upscale
         case .best: return .upscaleFidelity
         case .liveAction: return .upscaleVideoLiveAction
+        case .generative: return .upscaleGenerative
+        case .generativeClean: return .upscaleNacre
         }
     }
 
@@ -105,6 +110,11 @@ public final class EngineImageEnhancer: ImageEnhancer {
         guard let upscaleID = service.packageID(for: model) else {
             throw EnhanceError.unavailable(model, service.outcome(for: model)?.failure)
         }
+        // A generative stills tier runs behind the text-legibility guard, never bare (AB-D-0111).
+        if tier.isStillOnly {
+            return try await guardedUpscale(current, scale: requestedScale, tier: tier, model: model,
+                                            source: source, label: label)
+        }
         let upscaleStart = Date()
         let response: any CapabilityResponse
         do {
@@ -128,6 +138,41 @@ public final class EngineImageEnhancer: ImageEnhancer {
         return EnhanceOutcome(image: out, upscaleTier: Self.tier(for: model), upscaleModel: model.modelName)
     }
 
+    /// A generative tier through `EngineTextGuardedUpscaler`, with the policy its pair EARNED (`measuredPolicy(for:)`:
+    /// VOSR2 routes generative; Nacre protects legible words with the fast tier's pixels, AB-R-0400). Reports the tier,
+    /// the model or models whose pixels shipped, and the guard's route — so a composite never ships under one name.
+    private func guardedUpscale(_ current: Image, scale: Int, tier: UpscaleTier, model: ForgeModel,
+                                source: (width: Int, height: Int), label: String) async throws -> EnhanceOutcome {
+        let guarded = EngineTextGuardedUpscaler(service: service, generative: model)
+        if guarded.policy.wordProtection || guarded.policy.documentGate, service.packageID(for: guarded.base) == nil {
+            throw EnhanceError.unavailable(guarded.base, service.outcome(for: guarded.base)?.failure)
+        }
+        let start = Date()
+        let out: EngineTextGuardedUpscaler.Output
+        do {
+            out = try await guarded.upscale(try EngineImageCoding.cgImage(from: current), scale: scale)
+        } catch {
+            if let why = Self.governorRefusal(error) { throw EnhanceError.declined(model, why) }
+            throw error
+        }
+        lastAppliedScale = Int((Double(out.image.width) / Double(source.width)).rounded())
+        let name = Self.guardedModelName(generative: model, base: guarded.base, route: out.route)
+        log.notice("\(label, privacy: .public): guarded upscale (\(name, privacy: .public), \(tier.rawValue, privacy: .public), route \(out.route.rawValue, privacy: .public)) \(source.width, privacy: .public)×\(source.height, privacy: .public) → \(out.image.width, privacy: .public)×\(out.image.height, privacy: .public) in \(Date().timeIntervalSince(start), format: .fixed(precision: 2), privacy: .public) s")
+        return EnhanceOutcome(image: out.image, upscaleTier: Self.tier(for: model), upscaleModel: name,
+                              upscaleRoute: out.route.rawValue)
+    }
+
+    /// The name a guarded result ships under: the generative model alone, or both models when the guard composited
+    /// the fast tier's pixels in (protected words), or the fast tier alone when it kept a legible document page.
+    static func guardedModelName(generative: ForgeModel, base: ForgeModel,
+                                 route: TextLegibilityGuard.Verdict.Recommendation) -> String {
+        switch route {
+        case .generative: return generative.modelName
+        case .protectWords: return "\(generative.modelName) + \(base.modelName) (protected words)"
+        case .keepBase: return "\(base.modelName) (legible document kept)"
+        }
+    }
+
     /// Can `tier` run on this Mac, and if not, why — the governor's own arithmetic over the model's declared
     /// footprint, evaluated without loading anything. The Kit asks this before every upscale and fails the item on
     /// a refusal; ForgeOptimizerUI asks it to show a tier as unavailable with this reason.
@@ -144,6 +189,15 @@ public final class EngineImageEnhancer: ImageEnhancer {
         guard service.packageID(for: model) != nil else {
             let why = service.outcome(for: model)?.failure ?? "registration has not run"
             return .unavailable(tier, model: model.modelName, reason: "\(model.modelName) is not registered — \(why)")
+        }
+        // A guarded generative tier whose earned policy can route words to the fast tier needs that tier too.
+        if tier.isStillOnly {
+            let policy = EngineTextGuardedUpscaler.measuredPolicy(for: model)
+            if policy.wordProtection || policy.documentGate, service.packageID(for: .upscale) == nil {
+                let why = service.outcome(for: .upscale)?.failure ?? "registration has not run"
+                return .unavailable(tier, model: model.modelName,
+                                    reason: "the text guard's fast tier (\(ForgeModel.upscale.modelName)) is not registered — \(why)")
+            }
         }
         guard let verdict = await service.admissibility(for: model) else {
             return .available(tier, model: model.modelName)

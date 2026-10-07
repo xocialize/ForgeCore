@@ -62,7 +62,9 @@ public struct ForgeCapabilities {
             // availability stays keyed on the fast tier: Optimize runs without Best, and whether Best can run HERE is a
             // per-tier answer with a reason — `enhancer.availability(of: .best)` — not a capability-wide boolean.
             // `.upscaleVideoLiveAction` (FlashVSR) likewise: a per-clip answer, `videoUpscaler.availability(of:…)`.
-            ("Optimize", [.restore, .upscale, .upscaleFidelity, .upscaleVideoLiveAction],
+            // `.upscaleGenerative` (VOSR2) and `.upscaleNacre` (Nacre) are its Generative stills tiers since 0.33.0
+            // (AB-D-0111), each behind the text guard — again a per-tier answer, never a default.
+            ("Optimize", [.restore, .upscale, .upscaleFidelity, .upscaleGenerative, .upscaleNacre, .upscaleVideoLiveAction],
              isRegistered(.restore) && isRegistered(.upscale)),
             ("Extract",  [.matte, .promptMask, .promptMaskQuality, .flow], isRegistered(.matte)),
             ("Colorize", [.colorize, .flow], isRegistered(.colorize)),

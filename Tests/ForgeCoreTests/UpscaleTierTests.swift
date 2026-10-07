@@ -2,6 +2,7 @@ import Testing
 import MLXToolKit
 import MLXNERVE
 import MLXHEART
+import ForgeOptimizerKit
 import MLXNacre
 @testable import ForgeCore
 
@@ -138,11 +139,14 @@ import MLXNacre
         #expect(c.peakActivationBytesHint == NacreConfiguration.declaredActivationBytes(quant: .fp16, tile: 128))
     }
 
-    /// Opt-in means no default route lists it: Optimize's tier list is unchanged by the sixth backer.
-    @Test @MainActor func nacreIsOnNoDefaultRoute() {
+    /// Nacre is reachable as a user-chosen tier (`.generativeClean`, AB-D-0111) and never a default route: the
+    /// default tier stays `.fast` (NERVE), and only Optimize lists it.
+    @Test @MainActor func nacreIsAUserChosenTierNeverADefault() {
+        #expect(Options().upscaleTier == .fast)
+        #expect(EngineImageEnhancer.model(for: .fast) == .upscale)
         let caps = ForgeCapabilities(service: ForgeEngineService())   // no registerAll — construction only
-        for tier in caps.qualityTierAvailability {
-            #expect(!tier.models.contains(.upscaleNacre), "\(tier.capability) lists the opt-in generative variant")
+        for tier in caps.qualityTierAvailability where tier.capability != "Optimize" {
+            #expect(!tier.models.contains(.upscaleNacre), "\(tier.capability) lists the generative variant")
         }
     }
 
@@ -163,7 +167,9 @@ import MLXNacre
         let caps = ForgeCapabilities(service: ForgeEngineService())   // no registerAll — construction only
         let optimize = caps.qualityTierAvailability.first { $0.capability == "Optimize" }
         // FlashVSR joined 2026-10-04 as the Live action video tier — listed, availability per clip (`videoUpscaler`).
-        #expect(optimize?.models == [.restore, .upscale, .upscaleFidelity, .upscaleVideoLiveAction])
+        // VOSR2 and Nacre joined 2026-10-07 as the Generative stills tiers (AB-D-0111) — availability per tier.
+        #expect(optimize?.models == [.restore, .upscale, .upscaleFidelity, .upscaleGenerative, .upscaleNacre,
+                                     .upscaleVideoLiveAction])
     }
 
     /// The guard adapter accepts any generative tier (it is main-actor isolated, like the service it wraps).

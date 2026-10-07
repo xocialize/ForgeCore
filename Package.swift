@@ -37,7 +37,9 @@ let package = Package(
         // 2026-06-24).
         // 0.21.0 = `ConformQuality.quality(UpscaleTier)` + `ImageEnhancer.upscaleReporting(_:factor:tier:)`, which
         // `EngineImageEnhancer` implements so a quality conform runs the tier's upscaler with no restore (AB-T-0195).
-        .package(url: "https://github.com/xocialize/ForgeOptimizerKit.git", from: "0.21.0"),
+        // 0.22.0 = the generative stills tiers `UpscaleTier.generative` / `.generativeClean` + `EnhanceOutcome.upscaleRoute`,
+        // which `EngineImageEnhancer` maps to VOSR2 / Nacre behind the text guard (AB-T-0201, AB-D-0111).
+        .package(url: "https://github.com/xocialize/ForgeOptimizerKit.git", from: "0.22.0"),
         .package(url: "https://github.com/xocialize/ExtractKit.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/ColorizeKit.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/EraseKit.git", from: "0.2.0"),
