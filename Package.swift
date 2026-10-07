@@ -35,7 +35,9 @@ let package = Package(
         // stronger guarantee. ⚠️ URL-at-a-tag, never a path — mixing the two for one package identity
         // jams the whole graph at the lowest pin any consumer holds (`Docs/LESSONS.md` "SPM gotcha",
         // 2026-06-24).
-        .package(url: "https://github.com/xocialize/ForgeOptimizerKit.git", from: "0.20.0"),
+        // 0.21.0 = `ConformQuality.quality(UpscaleTier)` + `ImageEnhancer.upscaleReporting(_:factor:tier:)`, which
+        // `EngineImageEnhancer` implements so a quality conform runs the tier's upscaler with no restore (AB-T-0195).
+        .package(url: "https://github.com/xocialize/ForgeOptimizerKit.git", from: "0.21.0"),
         .package(url: "https://github.com/xocialize/ExtractKit.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/ColorizeKit.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/EraseKit.git", from: "0.2.0"),
@@ -71,7 +73,10 @@ let package = Package(
         // its shared tile driver, but ForgeCore no longer registers a Real-ESRGAN package.
         .package(url: "https://github.com/xocialize/mlx-nerve-swift.git", from: "0.1.0"),
     // The quality tier behind `imageUpscale` — a second backer, not a replacement.
-    .package(url: "https://github.com/xocialize/mlx-seedvr2-swift.git", from: "0.9.1"),
+    // 0.10.0 = WeightSourcing (AB-T-0197): the engine materializes SeedVR2 into the attached model store with `.downloading`
+    // progress; a v0.9.x in-store snapshot is honored, then adopted by rename, never re-downloaded. An app still on ≤ 0.9.x
+    // that shares the store would re-download after adoption — rebuild sharers together.
+    .package(url: "https://github.com/xocialize/mlx-seedvr2-swift.git", from: "0.10.0"),
         // The GENERATIVE stills tier behind `imageUpscale` — VOSR2 (AB-T-0184/AB-T-0185): a third backer, beside
         // the fast tier (Real-ESRGAN then, NERVE since 2026-09-28) and SeedVR2 (quality/diffusion), never a replacement.
         .package(url: "https://github.com/xocialize/mlx-vosr-swift.git", from: "0.1.0"),
@@ -108,7 +113,9 @@ let package = Package(
         // full-reference metric structurally penalises a generative upscaler for inventing
         // plausible-but-different detail more than it penalises an interpolator for inventing
         // nothing. Both oracles must be linkable here or the rule cannot be honoured by a consumer.
-        .package(url: "https://github.com/xocialize/mlx-siglip2-iqa-swift.git", from: "0.3.0"),
+        // 0.4.0 = WeightSourcing (AB-T-0196): the backbone materializes into the attached store with `.downloading`
+        // progress; a pre-0.4.0 `<store>/SigLIP2/` copy is adopted by move, a store-less cache copy is re-materialized.
+        .package(url: "https://github.com/xocialize/mlx-siglip2-iqa-swift.git", from: "0.4.0"),
         .package(url: "https://github.com/xocialize/mlx-ddcolor-swift.git", from: "0.2.0"),
         .package(url: "https://github.com/xocialize/mlx-lama-swift.git", from: "0.2.0"),
         .package(url: "https://github.com/xocialize/mlx-sea-raft-swift.git", from: "0.5.0"),

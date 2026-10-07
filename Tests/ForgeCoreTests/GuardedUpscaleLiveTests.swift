@@ -47,8 +47,8 @@ import MaskKit
         try FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
 
         let service = ForgeEngineService()
-        // A model store so a WeightSourcing package (VOSR2) can be materialized by the engine: FORGE_GUARD_E2E_STORE,
-        // else the app's models folder when it exists (SeedVR2 keeps its own core cache either way).
+        // A model store so a WeightSourcing package (VOSR2, Nacre, and SeedVR2 since 0.10.0) can be materialized by the
+        // engine: FORGE_GUARD_E2E_STORE, else the app's models folder when it exists.
         let store = Self.env["FORGE_GUARD_E2E_STORE"].map { URL(fileURLWithPath: $0) }
             ?? FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Application Support/Forge/Models")
         if FileManager.default.fileExists(atPath: store.path) { await service.attachModelStore(root: store) }

@@ -77,21 +77,39 @@ public final class EngineImageEnhancer: ImageEnhancer {
             lastAppliedScale = nil
             return EnhanceOutcome(image: try EngineImageCoding.cgImage(from: current))
         }
+        return try await upscale(current, scale: requestedScale, tier: options.upscaleTier,
+                                 source: (image.width, image.height), label: "Enhance")
+    }
 
+    /// The upscale stage alone — no NAFNet restore. ForgeOptimizerKit's `conform(_:to:quality: .quality(tier))`
+    /// calls this (Kit ≥ 0.21.0, AB-T-0195): a conform is resize glue between pipeline stages, so a restore inside it
+    /// would change the content the next stage receives. Same tier map, refusals and report as `enhanceReporting`.
+    public func upscaleReporting(_ image: CGImage, factor: UpscaleFactor, tier: UpscaleTier) async throws -> EnhanceOutcome {
+        guard let requestedScale = factor.requestedScale else {
+            lastAppliedScale = nil
+            return EnhanceOutcome(image: image)
+        }
+        return try await upscale(try EngineImageCoding.rawImage(from: image), scale: requestedScale, tier: tier,
+                                 source: (image.width, image.height), label: "Conform")
+    }
+
+    /// Run `tier`'s one registration on `current` at `scale`, and report the registration that ran.
+    private func upscale(_ current: Image, scale requestedScale: Int, tier: UpscaleTier,
+                         source: (width: Int, height: Int), label: String) async throws -> EnhanceOutcome {
         // The tier's own backer or nothing. A tier that cannot run throws with its reason; the other tier never
         // stands in for it, because a "Best" that ran Fast would ship one model's pixels under another's name.
-        guard !options.upscaleTier.isVideoOnly else {
-            throw EnhanceError.videoOnlyTier(options.upscaleTier)
+        guard !tier.isVideoOnly else {
+            throw EnhanceError.videoOnlyTier(tier)
         }
-        let model = Self.model(for: options.upscaleTier)
+        let model = Self.model(for: tier)
         guard let upscaleID = service.packageID(for: model) else {
             throw EnhanceError.unavailable(model, service.outcome(for: model)?.failure)
         }
         let upscaleStart = Date()
         let response: any CapabilityResponse
         do {
-            response = try await engine.run(ImageUpscaleRequest(image: current, scale: requestedScale),
-                                            package: upscaleID)
+            response = try await service.engine.run(ImageUpscaleRequest(image: current, scale: requestedScale),
+                                                    package: upscaleID)
         } catch {
             if let why = Self.governorRefusal(error) { throw EnhanceError.declined(model, why) }
             throw error
@@ -104,7 +122,7 @@ public final class EngineImageEnhancer: ImageEnhancer {
         if upscaleResponse.appliedScale != requestedScale {
             log.notice("Upscale requested \(requestedScale)x, model applied \(upscaleResponse.appliedScale)x — recording the applied factor")
         }
-        log.notice("Enhance: upscale (\(model.modelName, privacy: .public), \(options.upscaleTier.rawValue, privacy: .public)) \(image.width, privacy: .public)×\(image.height, privacy: .public) → \(out.width, privacy: .public)×\(out.height, privacy: .public) in \(Date().timeIntervalSince(upscaleStart), format: .fixed(precision: 2), privacy: .public) s")
+        log.notice("\(label, privacy: .public): upscale (\(model.modelName, privacy: .public), \(tier.rawValue, privacy: .public)) \(source.width, privacy: .public)×\(source.height, privacy: .public) → \(out.width, privacy: .public)×\(out.height, privacy: .public) in \(Date().timeIntervalSince(upscaleStart), format: .fixed(precision: 2), privacy: .public) s")
 
         // Reported from the registration that ran, not from `options` (AB-T-0013's rule, one field over).
         return EnhanceOutcome(image: out, upscaleTier: Self.tier(for: model), upscaleModel: model.modelName)

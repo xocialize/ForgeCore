@@ -1,5 +1,5 @@
 {
-  "originHash" : "8cc0f12766402d0d1ce208f3b4a1784c833d762f8b6e47a66dc74221f1ab636e",
+  "originHash" : "d1fa811578a7aa91c3912011de99505e7ccd731069198df167450a1291f085cb",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -51,8 +51,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/ForgeOptimizerKit.git",
       "state" : {
-        "revision" : "4353466f8fcc6915c6a99487f9648054f1d60438",
-        "version" : "0.20.0"
+        "revision" : "a5ae8533c0b08c8c4b38159b837af3fe61394401",
+        "version" : "0.21.0"
       }
     },
     {
@@ -312,8 +312,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-seedvr2-swift.git",
       "state" : {
-        "revision" : "25cf126589a633de5755cba3a22b30b250740887",
-        "version" : "0.9.2"
+        "revision" : "c6d91863c2d4af79a65f183774e569513037f055",
+        "version" : "0.10.0"
       }
     },
     {
@@ -321,8 +321,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-siglip2-iqa-swift.git",
       "state" : {
-        "revision" : "44785cb0b6b433112c98f1b724f67d18fe7b6152",
-        "version" : "0.3.0"
+        "revision" : "d5bf5a32445e5398c0f28b9a527ead86c4154ac8",
+        "version" : "0.4.0"
       }
     },
     {
