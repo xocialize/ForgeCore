@@ -1,5 +1,5 @@
 {
-  "originHash" : "d25977b1cf2763795baff6372690fbff48caa1422506ca163cffb41e97341000",
+  "originHash" : "7f6e11da695c0d46130a890c0be63e67151701d071f997625cdb883aedfe261a",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -357,8 +357,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-vosr-swift.git",
       "state" : {
-        "revision" : "acb96ab829ff0162d0b2292c222297068e7c7a33",
-        "version" : "0.2.0"
+        "revision" : "4009e3a78a0dfa38a96f124c542229766d39bc88",
+        "version" : "0.2.1"
       }
     },
     {

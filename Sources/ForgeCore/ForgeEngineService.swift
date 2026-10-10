@@ -573,12 +573,15 @@ public final class ForgeEngineService {
                                                             imageWholeFramePixels: wholeFrame,
                                                             bankResidencyBudgetBytes: bankResidencyBudgetBytes))
             case .upscaleGenerative:
-                // VOSR2 (mlx-vosr-swift 0.1.0): fp16 is the default lane (49.3 dB vs the fp32 oracle); the package
-                // itself drops to its int8 DiT (46.7 dB) when the governor stamps less than 7 GB of headroom
-                // (BudgetAware), and tiles the VAE above 2048² of output. `defaultScale` 2 mirrors SeedVR2 so a
-                // request without a scale means the same thing on both generative tiers. The engine materializes
-                // mlx-community/VOSR2-fp16 (3.35 GB) into its store on first prepare. `FORGE_VOSR2_QUANT=int8|fp32`
-                // is a diagnostics lever only. Explicit id (the Restormer lesson, AB-L-0160).
+                // VOSR2 (mlx-vosr-swift ≥ 0.2.1): fp16 is the default lane (49.3 dB vs the fp32 oracle); the package
+                // itself drops to its int8 DiT (46.7 dB) when the governor stamps less headroom than fp16's declared
+                // working set (3.4 + 6.6 GB — BudgetAware), and tiles the VAE above 1024² of output (AB-D-0120: the
+                // tiled decode is 48 dB from the whole-frame one and halves the ×4 peak). Footprints are the in-app
+                // `phys_footprint` re-baseline of 2026-10-10 (AB-T-0185 step 6): fp16 ×4 on a 512² still 9.6 GB,
+                // int8 8.4 GB — a 16 GB Mac admits fp16. `defaultScale` 2 mirrors SeedVR2 so a request without a
+                // scale means the same thing on both generative tiers. The engine materializes mlx-community/VOSR2-fp16
+                // (3.35 GB) into its store on first prepare — only into an ATTACHED store (AB-L-0225).
+                // `FORGE_VOSR2_QUANT=int8|fp32` is a diagnostics lever only. Explicit id (the Restormer lesson, AB-L-0160).
                 let vosrQuant: Quant = {
                     switch ProcessInfo.processInfo.environment["FORGE_VOSR2_QUANT"] {
                     case "int8": return .int8

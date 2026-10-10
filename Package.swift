@@ -85,9 +85,10 @@ let package = Package(
     .package(url: "https://github.com/xocialize/mlx-seedvr2-swift.git", from: "0.10.0"),
         // The GENERATIVE stills tier behind `imageUpscale` — VOSR2 (AB-T-0184/AB-T-0185): a third backer, beside
         // the fast tier (Real-ESRGAN then, NERVE since 2026-09-28) and SeedVR2 (quality/diffusion), never a replacement.
-        // 0.2.0 = in-window convs through MLXExactConv (exact on mlx-swift 0.31.x and 0.32.x); 0.1.0 predates the
-        // Winograd fix entirely, and VOSR2 is Optimize's Generative tier since 2026-10-07 (AB-A-0119 follow-through).
-        .package(url: "https://github.com/xocialize/mlx-vosr-swift.git", from: "0.2.0"),
+        // 0.2.1 = footprints re-baselined to the in-app phys_footprint and the VAE tiled above 1024² of output
+        // (AB-D-0120, AB-T-0185 step 6); 0.2.0 = in-window convs through MLXExactConv (exact on mlx-swift 0.31.x and
+        // 0.32.x); 0.1.0 predates the Winograd fix. VOSR2 is Optimize's Generative tier since 2026-10-07.
+        .package(url: "https://github.com/xocialize/mlx-vosr-swift.git", from: "0.2.1"),
         // The FIDELITY stills tier behind `imageUpscale` — RealPLKSR `4x_webphoto_realplksr` (AB-T-0186 Step 1): a fourth
         // backer, ours end to end (trained on the Commons-SR corpus, weights vendored in the package — no download).
         // Public since 2026-09-28, which keeps this manifest's whole closure public for CI. 0.1.1 = the in-app
