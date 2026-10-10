@@ -127,7 +127,7 @@ let package = Package(
         .package(url: "https://github.com/xocialize/mlx-ddcolor-swift.git", from: "0.2.0"),
         // 0.3.0 = LaMa's FFC convs through MLXExactConv, exact on mlx-swift 0.31.x AND 0.32.x. 0.2.1's conv3d route
         // (the AB-A-0119 Winograd fix) is defeated on 0.32, which the app ships (`wave-0.32-approval-batch.md` §B).
-        .package(url: "https://github.com/xocialize/mlx-lama-swift.git", from: "0.3.0"),
+        .package(url: "https://github.com/xocialize/mlx-lama-swift.git", from: "0.3.1"),   // 0.3.1: LaMa-fp32 weights (bf16 cast colour fills pink, AB-R-0451)
         .package(url: "https://github.com/xocialize/mlx-sea-raft-swift.git", from: "0.5.0"),
         .package(url: "https://github.com/xocialize/mlx-edgetam-swift.git", from: "0.6.0"),
         // frameInterpolate — RIFE 4.25 (AB-T-0038). Ported and parity-locked 2026-06-18, but no

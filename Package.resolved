@@ -1,5 +1,5 @@
 {
-  "originHash" : "3634e97ad74b7ff6f43e31fa423bc97414cce6e53749f2a2b1abe828a264214d",
+  "originHash" : "6bef1e72ea3f56537fd02928b9cf29385d5b749de088eb387557a905917b53dd",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -213,8 +213,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-lama-swift.git",
       "state" : {
-        "revision" : "8dedf62bd5661d5c87619ed258834329d8f46435",
-        "version" : "0.3.0"
+        "revision" : "cbeae4cf4c0a0ab34cd56fd7ea69260be36a0a58",
+        "version" : "0.3.1"
       }
     },
     {
