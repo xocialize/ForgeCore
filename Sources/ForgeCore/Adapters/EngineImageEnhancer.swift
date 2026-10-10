@@ -98,7 +98,8 @@ public final class EngineImageEnhancer: ImageEnhancer {
                                  source: (image.width, image.height), label: "Conform")
     }
 
-    /// Run `tier`'s one registration on `current` at `scale`, and report the registration that ran.
+    /// Run `tier`'s one registration on `current` at `scale`, and report the registration that ran. A scale past
+    /// the tiers' native ×4 (×6, ×8) is served as a chain — see `ChainedUpscalePlan` (AB-D-0119).
     private func upscale(_ current: Image, scale requestedScale: Int, tier: UpscaleTier,
                          source: (width: Int, height: Int), label: String) async throws -> EnhanceOutcome {
         // The tier's own backer or nothing. A tier that cannot run throws with its reason; the other tier never
@@ -110,11 +111,24 @@ public final class EngineImageEnhancer: ImageEnhancer {
         guard let upscaleID = service.packageID(for: model) else {
             throw EnhanceError.unavailable(model, service.outcome(for: model)?.failure)
         }
+        let plan = ChainedUpscalePlan.make(requested: requestedScale,
+                                           source: .init(width: source.width, height: source.height))
+        if plan.isChained {
+            return try await chainedUpscale(current, plan: plan, tier: tier, model: model, upscaleID: upscaleID,
+                                            source: source, label: label)
+        }
         // A generative stills tier runs behind the text-legibility guard, never bare (AB-D-0111).
         if tier.isStillOnly {
             return try await guardedUpscale(current, scale: requestedScale, tier: tier, model: model,
                                             source: source, label: label)
         }
+        return try await singlePass(current, scale: requestedScale, tier: tier, model: model, upscaleID: upscaleID,
+                                    source: source, label: label)
+    }
+
+    /// One bare pass of `model` at `scale` — the non-generative tiers' whole story.
+    private func singlePass(_ current: Image, scale requestedScale: Int, tier: UpscaleTier, model: ForgeModel,
+                            upscaleID: PackageID, source: (width: Int, height: Int), label: String) async throws -> EnhanceOutcome {
         let upscaleStart = Date()
         let response: any CapabilityResponse
         do {
@@ -136,6 +150,58 @@ public final class EngineImageEnhancer: ImageEnhancer {
 
         // Reported from the registration that ran, not from `options` (AB-T-0013's rule, one field over).
         return EnhanceOutcome(image: out, upscaleTier: Self.tier(for: model), upscaleModel: model.modelName)
+    }
+
+    /// ×6 / ×8 (AB-D-0119): pass 1 is the chosen tier at its native ×4 exactly as a ×4 request would run it (guarded
+    /// for a generative tier); pass 2 is the fast fidelity tier (`.upscale`, NERVE) at ×2 on those pixels; a ×6 is
+    /// then fitted down from ×8 with Lanczos. The receipt names every model whose pixels shipped and the fit, and
+    /// `lastAppliedScale` is measured from the pixels. The second pass needs NERVE registered; if it is not, the
+    /// item fails with that reason rather than shipping a ×4 under a ×6 name.
+    private func chainedUpscale(_ current: Image, plan: ChainedUpscalePlan, tier: UpscaleTier, model: ForgeModel,
+                                upscaleID: PackageID, source: (width: Int, height: Int), label: String) async throws -> EnhanceOutcome {
+        let start = Date()
+        let first: EnhanceOutcome
+        if tier.isStillOnly {
+            first = try await guardedUpscale(current, scale: plan.primaryScale, tier: tier, model: model,
+                                             source: source, label: "\(label) pass 1")
+        } else {
+            first = try await singlePass(current, scale: plan.primaryScale, tier: tier, model: model,
+                                         upscaleID: upscaleID, source: source, label: "\(label) pass 1")
+        }
+        var image = first.image
+        if let secondary = plan.secondaryScale {
+            guard let fastID = service.packageID(for: .upscale) else {
+                throw EnhanceError.unavailable(.upscale, service.outcome(for: .upscale)?.failure)
+            }
+            let passStart = Date()
+            let response: any CapabilityResponse
+            do {
+                response = try await service.engine.run(
+                    ImageUpscaleRequest(image: try EngineImageCoding.rawImage(from: image), scale: secondary), package: fastID)
+            } catch {
+                if let why = Self.governorRefusal(error) { throw EnhanceError.declined(.upscale, why) }
+                throw error
+            }
+            guard let second = response as? ImageUpscaleResponse else {
+                throw EnhanceError.unexpectedResponse(.imageUpscale)
+            }
+            image = try EngineImageCoding.cgImage(from: second.image)
+            if second.appliedScale != secondary {
+                log.notice("Chained pass 2 requested \(secondary)x, \(ForgeModel.upscale.modelName, privacy: .public) applied \(second.appliedScale)x")
+            }
+            log.notice("\(label, privacy: .public) pass 2: upscale (\(ForgeModel.upscale.modelName, privacy: .public)) → \(image.width, privacy: .public)×\(image.height, privacy: .public) in \(Date().timeIntervalSince(passStart), format: .fixed(precision: 2), privacy: .public) s")
+        }
+        if let fit = plan.fit {
+            let fitStart = Date()
+            image = try ImageResampling.lanczos(image, toWidth: fit.width, height: fit.height)
+            log.notice("\(label, privacy: .public) fit: Lanczos → \(fit.width, privacy: .public)×\(fit.height, privacy: .public) in \(Date().timeIntervalSince(fitStart), format: .fixed(precision: 2), privacy: .public) s")
+        }
+        lastAppliedScale = Int((Double(image.width) / Double(source.width)).rounded())
+        let name = plan.modelName(primaryName: first.upscaleModel ?? model.modelName,
+                                  secondaryName: ForgeModel.upscale.modelName)
+        log.notice("\(label, privacy: .public): chained upscale ×\(plan.requested, privacy: .public) (\(name, privacy: .public), \(tier.rawValue, privacy: .public)) \(source.width, privacy: .public)×\(source.height, privacy: .public) → \(image.width, privacy: .public)×\(image.height, privacy: .public) in \(Date().timeIntervalSince(start), format: .fixed(precision: 2), privacy: .public) s")
+        return EnhanceOutcome(image: image, upscaleTier: first.upscaleTier, upscaleModel: name,
+                              upscaleRoute: first.upscaleRoute)
     }
 
     /// A generative tier through `EngineTextGuardedUpscaler`, with the policy its pair EARNED (`measuredPolicy(for:)`:
@@ -258,12 +324,15 @@ public final class EngineImageEnhancer: ImageEnhancer {
 }
 
 extension UpscaleFactor {
-    /// Integer scale for the engine request; nil means "skip the upscale stage".
+    /// Integer scale for the engine request; nil means "skip the upscale stage". ×6 and ×8 exceed every tier's
+    /// native ×4 and are served as a chain (`ChainedUpscalePlan`).
     var requestedScale: Int? {
         switch self {
         case .none: return nil
         case .x2:   return 2
         case .x4:   return 4
+        case .x6:   return 6
+        case .x8:   return 8
         }
     }
 }
