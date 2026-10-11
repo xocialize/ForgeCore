@@ -39,7 +39,9 @@ let package = Package(
         // `EngineImageEnhancer` implements so a quality conform runs the tier's upscaler with no restore (AB-T-0195).
         // 0.22.0 = the generative stills tiers `UpscaleTier.generative` / `.generativeClean` + `EnhanceOutcome.upscaleRoute`,
         // which `EngineImageEnhancer` maps to VOSR2 / Nacre behind the text guard (AB-T-0201, AB-D-0111).
-        .package(url: "https://github.com/xocialize/ForgeOptimizerKit.git", from: "0.23.0"),
+        // 0.24.0 = conform keeps 16 bits for a deep image (G-6), so a 16-bit still reaches the 16-bit model boundary
+        // (AB-A-0158) with its depth.
+        .package(url: "https://github.com/xocialize/ForgeOptimizerKit.git", from: "0.24.0"),
         .package(url: "https://github.com/xocialize/ExtractKit.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/ColorizeKit.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/EraseKit.git", from: "0.2.0"),
@@ -50,7 +52,9 @@ let package = Package(
         // The engine. v0.37.0 is the FIRST tag carrying `licenseEnforcement` (contract 1.28.0) —
         // do not lower this floor, or `.blocking` silently stops being expressible.
         // 0.61.0: external tenants with a shrink REASON (contract 1.46.0) — ForgeExternalTenant needs it.
-        .package(url: "https://github.com/xocialize/mlx-engine-swift.git", from: "0.61.0"),
+        // 0.67.0: the 16-bit image boundary (contract 1.52.0, AB-A-0158) — `.rawRGBA16` + `rawImageFormats`, which
+        // EngineImageCoding and `ForgeEngineService.keepsSixteenBits` use.
+        .package(url: "https://github.com/xocialize/mlx-engine-swift.git", from: "0.67.0"),
 
         // Model wrappers — the heavy pins.
         .package(url: "https://github.com/xocialize/mlx-nafnet-swift.git", from: "0.4.0"),
@@ -94,7 +98,8 @@ let package = Package(
         // Public since 2026-09-28, which keeps this manifest's whole closure public for CI. 0.1.1 = the in-app
         // phys_footprint re-baseline (0.1 + 8.6 GB, AB-T-0019): below it the governor charges a derived 12.55 GB, which
         // on a 16 GB Mac (budget ≈ 12.7 GB) admits Optimize's Best only after evicting everything else.
-        .package(url: "https://github.com/xocialize/mlx-realplksr-swift.git", from: "0.1.1"),
+        // 0.2.0 = 16 bits end to end (AB-A-0158): the first tier that keeps a 16-bit source's depth through the model.
+        .package(url: "https://github.com/xocialize/mlx-realplksr-swift.git", from: "0.2.0"),
         // HEART (AB-T-0189 / AB-R-0379) — the OPT-IN fidelity variant behind RealPLKSR: Phips/HEART, Apache-2.0 code and
         // weights trained only on a CC0 corpus (AB-D-0106), 16.7 M-param HAT-iLN window attention; weights materialize
         // from mlx-community/HEART-fp16 (34 MB per variant). Registered as `.upscaleHEART` — reachable, never a default

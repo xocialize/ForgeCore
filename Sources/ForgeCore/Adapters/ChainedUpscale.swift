@@ -94,7 +94,8 @@ public struct ChainedUpscalePlan: Equatable, Sendable {
     }
 }
 
-/// The one resampler the chain uses: CoreImage's Lanczos scale, sRGB in and out, cropped to the exact size.
+/// The one resampler the chain uses: CoreImage's Lanczos scale, sRGB in and out, cropped to the exact size. A deep
+/// (16-bit) image comes out 16-bit (AB-A-0158); an 8-bit one renders exactly as it always has.
 public enum ImageResampling {
     public enum ResampleError: Error, CustomStringConvertible {
         case badSize(Int, Int)
@@ -127,7 +128,12 @@ public enum ImageResampling {
         guard let output = filter.outputImage else { throw ResampleError.renderFailed }
         // Lanczos pads its extent by the filter support; crop to the exact target so the size is what was asked.
         let rect = CGRect(x: 0, y: 0, width: width, height: height)
-        guard let cg = context.createCGImage(output.cropped(to: rect), from: rect) else { throw ResampleError.renderFailed }
+        // Without a `format:` CoreImage renders 8 bits, which would undo a 16-bit chain at its last step.
+        let rendered = EngineImageCoding.isDeep(image)
+            ? context.createCGImage(output.cropped(to: rect), from: rect, format: .RGBA16,
+                                    colorSpace: CGColorSpace(name: CGColorSpace.sRGB))
+            : context.createCGImage(output.cropped(to: rect), from: rect)
+        guard let cg = rendered else { throw ResampleError.renderFailed }
         return cg
     }
 }

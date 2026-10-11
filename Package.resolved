@@ -1,5 +1,5 @@
 {
-  "originHash" : "7f6e11da695c0d46130a890c0be63e67151701d071f997625cdb883aedfe261a",
+  "originHash" : "046444221a3edf1895329d1982ef0020eff42699879c36fec51affae7c463d37",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -51,8 +51,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/ForgeOptimizerKit.git",
       "state" : {
-        "revision" : "fb15cc878785a85c857a61c41761d148b1453eae",
-        "version" : "0.23.0"
+        "revision" : "c9b5f5d193aad5ca5910014711d1e8c5577bdd80",
+        "version" : "0.24.0"
       }
     },
     {
@@ -168,8 +168,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-engine-swift.git",
       "state" : {
-        "revision" : "133b6b176913142274211c346f9ba5642ea43c64",
-        "version" : "0.63.0"
+        "revision" : "aba512f37c8228adce4cac682583acea612bd6f7",
+        "version" : "0.67.0"
       }
     },
     {
@@ -258,8 +258,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-realesrgan-swift.git",
       "state" : {
-        "revision" : "f28e58a5393513f526e8f8dca66fcd2db8fdb13d",
-        "version" : "0.7.0"
+        "revision" : "5f84e0d845e6b2c6e8d18a88e979cb54b8ff6fb6",
+        "version" : "0.8.1"
       }
     },
     {
@@ -267,8 +267,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-realplksr-swift.git",
       "state" : {
-        "revision" : "ff2e7f3b330fb18563741d2c8edb997624e6fa48",
-        "version" : "0.1.2"
+        "revision" : "80fa6306e74a3e216fdb027d60c9a4c6d4a2f41c",
+        "version" : "0.2.0"
       }
     },
     {
@@ -321,8 +321,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-seedvr2-swift.git",
       "state" : {
-        "revision" : "c6d91863c2d4af79a65f183774e569513037f055",
-        "version" : "0.10.0"
+        "revision" : "92ce47312dcdfde31f1c685c8e2799937eb16e9e",
+        "version" : "0.10.1"
       }
     },
     {

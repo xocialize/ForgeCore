@@ -807,6 +807,15 @@ public final class ForgeEngineService {
         return await engine.admissibility(for: manifest.requirements, configuration: configuration)
     }
 
+    /// Whether `model`'s registered surface keeps 16 bits end to end — it declares `.rawRGBA16` in
+    /// `ToolDescriptor.rawImageFormats` (MLXToolKit contract 1.52.0, AB-A-0158). Read from the manifest the engine
+    /// registered, never from a table here, so a package floor raise is all it takes for a tier to go 16-bit. false
+    /// when the model did not register. Adapters pass it as `EngineImageCoding.rawImage(from:keepingDepth:)`.
+    public func keepsSixteenBits(_ model: ForgeModel) async -> Bool {
+        guard let id = packageIDs[model], let manifest = await engine.manifest(for: id) else { return false }
+        return manifest.surfaces.first { $0.capability == model.capability }?.acceptsRawRGBA16 == true
+    }
+
     /// The engine's memory budget on this Mac — what `admissibility(for:)` measures against.
     public var memoryBudgetBytes: UInt64 {
         get async { await engine.memory.budgetBytes }

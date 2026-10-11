@@ -5,6 +5,9 @@
 //  ForgeOptimizerKit's `ImageEnhancer` seam, engine-backed: NAFNet restore → the upscale tier the caller chose —
 //  NERVE for `.fast` (Real-ESRGAN until 2026-09-28), RealPLKSR for `.best` (AB-T-0187).
 //  Both wrappers mirror `.rawBGRA8`, so the whole chain stays raw — no PNG hop between stages.
+//  16 bits (AB-A-0158): each hop sends a deep image as `.rawRGBA16` when that hop's registration keeps 16 bits
+//  (`ForgeEngineService.keepsSixteenBits` — RealPLKSR ≥ 0.2.0 today), and `.rawBGRA8` otherwise, so a 16-bit source
+//  keeps its depth through every model that can carry it and loses it only at one that cannot.
 //
 
 import Foundation
@@ -65,7 +68,7 @@ public final class EngineImageEnhancer: ImageEnhancer {
 
     public func enhanceReporting(_ image: CGImage, options: Options) async throws -> EnhanceOutcome {
         let engine = service.engine
-        var current = try EngineImageCoding.rawImage(from: image)
+        var current = try EngineImageCoding.rawImage(from: image, keepingDepth: await service.keepsSixteenBits(.restore))
 
         guard let restoreID = service.packageID(for: .restore) else {
             throw EnhanceError.unavailable(.restore, service.outcome(for: .restore)?.failure)
@@ -94,8 +97,11 @@ public final class EngineImageEnhancer: ImageEnhancer {
             lastAppliedScale = nil
             return EnhanceOutcome(image: image)
         }
-        return try await upscale(try EngineImageCoding.rawImage(from: image), scale: requestedScale, tier: tier,
-                                 source: (image.width, image.height), label: "Conform")
+        // The tier's own registration decides the depth it is sent (AB-A-0158): a deep source stays 16-bit only into a
+        // model that declares it.
+        let keep = await service.keepsSixteenBits(Self.model(for: tier))
+        return try await upscale(try EngineImageCoding.rawImage(from: image, keepingDepth: keep), scale: requestedScale,
+                                 tier: tier, source: (image.width, image.height), label: "Conform")
     }
 
     /// Run `tier`'s one registration on `current` at `scale`, and report the registration that ran. A scale past
@@ -176,8 +182,10 @@ public final class EngineImageEnhancer: ImageEnhancer {
             let passStart = Date()
             let response: any CapabilityResponse
             do {
+                let keep = await service.keepsSixteenBits(.upscale)
                 response = try await service.engine.run(
-                    ImageUpscaleRequest(image: try EngineImageCoding.rawImage(from: image), scale: secondary), package: fastID)
+                    ImageUpscaleRequest(image: try EngineImageCoding.rawImage(from: image, keepingDepth: keep),
+                                        scale: secondary), package: fastID)
             } catch {
                 if let why = Self.governorRefusal(error) { throw EnhanceError.declined(.upscale, why) }
                 throw error

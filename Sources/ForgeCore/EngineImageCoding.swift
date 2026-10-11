@@ -18,6 +18,12 @@
 //  they need — this type does not guess, because handing raw bytes to a PNG-only wrapper fails as a
 //  decode error deep inside the package rather than here.
 //
+//  16 bits (contract 1.52.0, AB-A-0158): `.rawRGBA16` carries a deep image to a surface that declares it
+//  (`ToolDescriptor.rawImageFormats`; `ForgeEngineService.keepsSixteenBits`). The caller opts in per call
+//  (`rawImage(from:keepingDepth:)`), because the engine refuses `.rawRGBA16` on a surface that does not
+//  declare it; an 8-bit image is `.rawBGRA8` either way, byte for byte. Decoding is by format, so
+//  `cgImage(from:)` returns a 16-bit image whenever the package answered in 16 bits.
+//
 
 import Foundation
 import CoreGraphics
@@ -42,10 +48,20 @@ public enum EngineImageCoding {
         CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
     public static let bgraColorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
 
+    /// RGBA, 16 bits per component, little-endian, premultiplied — `.rawRGBA16` as CoreGraphics draws it.
+    public static let rgba16BitmapInfo =
+        CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder16Little.rawValue
+
+    /// Whether `cg` carries more than 8 bits per component — the images the 16-bit boundary exists for.
+    public static func isDeep(_ cg: CGImage) -> Bool { cg.bitsPerComponent > 8 }
+
     // MARK: - CGImage → Image
 
-    /// Render into a tightly-packed 32BGRA buffer and hand the pixels over directly.
-    public static func rawImage(from cg: CGImage) throws -> Image {
+    /// Render into raw pixels and hand them over directly. `keepingDepth`: a deep `cg` becomes `.rawRGBA16` —
+    /// pass it only for a surface that keeps 16 bits (`ForgeEngineService.keepsSixteenBits`). An 8-bit `cg`, or
+    /// `keepingDepth: false`, gives the tightly-packed 32BGRA `.rawBGRA8` this always produced.
+    public static func rawImage(from cg: CGImage, keepingDepth: Bool = false) throws -> Image {
+        if keepingDepth, isDeep(cg) { return try rawRGBA16(from: cg) }
         let w = cg.width, h = cg.height
         let bytesPerRow = w * 4
         guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8,
@@ -55,6 +71,19 @@ public enum EngineImageCoding {
         ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
         return Image.rawBGRA8(data: Data(bytes: base, count: bytesPerRow * h),
                               width: w, height: h, bytesPerRow: bytesPerRow)
+    }
+
+    /// Render into a tightly-packed RGBA16 buffer (sRGB, `rgba16BitmapInfo`) as `.rawRGBA16`.
+    public static func rawRGBA16(from cg: CGImage) throws -> Image {
+        let w = cg.width, h = cg.height
+        let bytesPerRow = w * 8
+        guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 16,
+                                  bytesPerRow: bytesPerRow, space: bgraColorSpace,
+                                  bitmapInfo: rgba16BitmapInfo),
+              let base = ctx.data else { throw CodingError.encodeFailed }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        return Image.rawRGBA16(data: Data(bytes: base, count: bytesPerRow * h),
+                               width: w, height: h, bytesPerRow: bytesPerRow)
     }
 
     /// PNG-encode, for wrappers that have not adopted rawBGRA8.
@@ -72,6 +101,7 @@ public enum EngineImageCoding {
     /// Accepts either encoding: raw pixels go straight into a `CGImage` via `CGDataProvider`; png/jpeg
     /// fall back to `CGImageSource`. A wrapper that ignores a raw request and answers in PNG still works.
     public static func cgImage(from image: Image) throws -> CGImage {
+        if image.format == .rawRGBA16 { return try cgImage(fromRGBA16: image) }
         guard image.format == .rawBGRA8 else { return try cgImage(fromEncoded: image.data) }
         guard let w = image.width, let h = image.height else { throw CodingError.missingDimensions }
         let bytesPerRow = image.bytesPerRow ?? (w * 4)
@@ -79,6 +109,22 @@ public enum EngineImageCoding {
               let cg = CGImage(width: w, height: h, bitsPerComponent: 8, bitsPerPixel: 32,
                                bytesPerRow: bytesPerRow, space: bgraColorSpace,
                                bitmapInfo: CGBitmapInfo(rawValue: bgraBitmapInfo),
+                               provider: provider, decode: nil, shouldInterpolate: false,
+                               intent: .defaultIntent) else {
+            throw CodingError.decodeFailed
+        }
+        return cg
+    }
+
+    /// A `.rawRGBA16` image as a 16-bit sRGB `CGImage` over its bytes.
+    static func cgImage(fromRGBA16 image: Image) throws -> CGImage {
+        guard let w = image.width, let h = image.height else { throw CodingError.missingDimensions }
+        let bytesPerRow = image.bytesPerRow ?? (w * 8)
+        guard image.data.count >= bytesPerRow * h,
+              let provider = CGDataProvider(data: image.data as CFData),
+              let cg = CGImage(width: w, height: h, bitsPerComponent: 16, bitsPerPixel: 64,
+                               bytesPerRow: bytesPerRow, space: bgraColorSpace,
+                               bitmapInfo: CGBitmapInfo(rawValue: rgba16BitmapInfo),
                                provider: provider, decode: nil, shouldInterpolate: false,
                                intent: .defaultIntent) else {
             throw CodingError.decodeFailed

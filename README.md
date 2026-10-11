@@ -138,12 +138,21 @@ tag on which `.blocking` is expressible at all.
 they need rather than letting it guess, because handing raw bytes to a PNG-only wrapper fails as a decode
 error deep inside that package instead of at the boundary.
 
-| Wrapper | Mirrors `.rawBGRA8` |
-|---|---|
-| `mlx-nafnet-swift`, `mlx-nerve-swift`, `mlx-realplksr-swift` | ✅ — Optimize runs raw end to end |
-| BiRefNet, DDColor, LaMa, SEA-RAFT, EdgeTAM | ❌ — PNG leg (tracked as BRIDGE-041) |
+| Wrapper | Mirrors `.rawBGRA8` | Keeps 16 bits (`.rawRGBA16`) |
+|---|---|---|
+| `mlx-realplksr-swift` ≥ 0.2.0 | ✅ | ✅ — Best keeps a 16-bit still's depth through the model |
+| `mlx-nafnet-swift`, `mlx-nerve-swift` | ✅ — Optimize runs raw end to end | ❌ — 8 bits for now (AB-A-0158 follow-on) |
+| BiRefNet, DDColor, LaMa, SEA-RAFT, EdgeTAM | ❌ — PNG leg (tracked as BRIDGE-041) | ❌ |
 
 `Matte` is PNG-only by contract regardless.
+
+**16 bits** (MLXToolKit contract 1.52.0, AB-A-0158): `rawImage(from:keepingDepth:)` sends a deep (more than 8 bits
+per component) image as `.rawRGBA16` only when asked to. `EngineImageEnhancer` asks per hop, with
+`ForgeEngineService.keepsSixteenBits(_:)`, which reads the registered surface's `rawImageFormats` declaration. So a
+16-bit source stays 16-bit through every model that declares it, and the engine refuses `.rawRGBA16` anywhere else.
+`cgImage(from:)` decodes by format and returns a 16-bit image whenever the package answered in 16 bits. The ×6/×8
+chain's Lanczos fit keeps 16 bits for a deep image. The generative tiers' text guard composites at 8 bits, and those
+tiers stay 8-bit.
 
 ## Dependency visibility
 
