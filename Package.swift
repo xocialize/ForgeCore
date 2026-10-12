@@ -73,9 +73,10 @@ let package = Package(
         // in-window 3×3 convs; 0.1.1 routed around it through conv3d, which mlx-swift 0.32 defeats again (gfpgan's lane
         // fails at 1.01e-3 there). 0.2.0 routes through MLXExactConv — exact on 0.31.x and 0.32.x (7.5e-7) — and the
         // app ships 0.32.3, so nothing below 0.2.0 may resolve (`wave-0.32-approval-batch.md` §B). 0.3.0: the face pass warps,
-        // pastes and masks at 16 bits for a `.rawRGBA16` image, and faces come in a fixed order (AB-T-0230).
-        .package(url: "https://github.com/xocialize/mlx-gfpgan-swift.git", from: "0.3.0"),
-        .package(url: "https://github.com/xocialize/mlx-restoreformer-swift.git", from: "0.3.0"),
+        // pastes and masks at 16 bits for a `.rawRGBA16` image, and faces come in a fixed order (AB-T-0230). 0.3.1: no dark
+        // line along the image edge when a face's crop extends past the frame — every close-up (AB-T-0227).
+        .package(url: "https://github.com/xocialize/mlx-gfpgan-swift.git", from: "0.3.1"),
+        .package(url: "https://github.com/xocialize/mlx-restoreformer-swift.git", from: "0.3.1"),
         .package(url: "https://github.com/xocialize/mlx-bopbtl-swift.git", from: "0.2.0"),
         // Category A Kit — RestoreTier2 is the provider-protocol seam this package implements
         // (BRIDGE-070). One-way: the Kit never depends back on ForgeCore.

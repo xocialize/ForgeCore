@@ -1,5 +1,5 @@
 {
-  "originHash" : "8f63e603f4d30a634579a93f33e462a11468083d9054f5dceb895f371d0688d5",
+  "originHash" : "e040940e167ad8391f391e737d5cfed89c7294396dfa68b11aa613eee4639177",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -195,8 +195,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-gfpgan-swift.git",
       "state" : {
-        "revision" : "0d4bcbacc92a5bf8799c4ba4f801718135b6f074",
-        "version" : "0.3.0"
+        "revision" : "fbd46c1acf47a41d1ad295f72408651971058902",
+        "version" : "0.3.1"
       }
     },
     {
@@ -276,8 +276,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-restoreformer-swift.git",
       "state" : {
-        "revision" : "6d61c4679561a6fc7614c1ceb76ea910e9766402",
-        "version" : "0.3.0"
+        "revision" : "b13ca1cd6e5d1efd1e600be97bdae7ea9fc8786e",
+        "version" : "0.3.1"
       }
     },
     {
