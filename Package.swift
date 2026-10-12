@@ -57,7 +57,8 @@ let package = Package(
         .package(url: "https://github.com/xocialize/mlx-engine-swift.git", from: "0.67.0"),
 
         // Model wrappers — the heavy pins.
-        .package(url: "https://github.com/xocialize/mlx-nafnet-swift.git", from: "0.4.0"),
+        // 0.6.0: NAFNet keeps 16 bits (`.rawRGBA16`, AB-T-0230), so Optimize's restore hop no longer cuts a 16-bit source to 8.
+        .package(url: "https://github.com/xocialize/mlx-nafnet-swift.git", from: "0.6.0"),
         // The frame-restore wave (BRIDGE-066) + face pair (064-face) + relight (BRIDGE-067) —
         // registered 2026-07-31, ending the state where shipped packages were invisible to apps.
         // FFTformer (`mlx-fftformer-swift`) was in this wave and was UNREGISTERED 2026-10-06 (AB-D-0111): worse than
@@ -70,9 +71,10 @@ let package = Package(
         // Face pair floors = the MLXExactConv releases (AB-A-0119, 2026-10-07). mlx's GPU Winograd conv2d is lossy on
         // in-window 3×3 convs; 0.1.1 routed around it through conv3d, which mlx-swift 0.32 defeats again (gfpgan's lane
         // fails at 1.01e-3 there). 0.2.0 routes through MLXExactConv — exact on 0.31.x and 0.32.x (7.5e-7) — and the
-        // app ships 0.32.3, so nothing below 0.2.0 may resolve (`wave-0.32-approval-batch.md` §B).
-        .package(url: "https://github.com/xocialize/mlx-gfpgan-swift.git", from: "0.2.0"),
-        .package(url: "https://github.com/xocialize/mlx-restoreformer-swift.git", from: "0.2.0"),
+        // app ships 0.32.3, so nothing below 0.2.0 may resolve (`wave-0.32-approval-batch.md` §B). 0.3.0: the face pass warps,
+        // pastes and masks at 16 bits for a `.rawRGBA16` image, and faces come in a fixed order (AB-T-0230).
+        .package(url: "https://github.com/xocialize/mlx-gfpgan-swift.git", from: "0.3.0"),
+        .package(url: "https://github.com/xocialize/mlx-restoreformer-swift.git", from: "0.3.0"),
         .package(url: "https://github.com/xocialize/mlx-bopbtl-swift.git", from: "0.2.0"),
         // Category A Kit — RestoreTier2 is the provider-protocol seam this package implements
         // (BRIDGE-070). One-way: the Kit never depends back on ForgeCore.

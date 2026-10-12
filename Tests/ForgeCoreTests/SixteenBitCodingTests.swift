@@ -74,6 +74,20 @@ struct SixteenBitCodingTests {
         #expect(try EngineImageCoding.rawImage(from: deep, keepingDepth: false).format == .rawBGRA8)
     }
 
+    /// The restore hop's 16-bit answer reaches the upscale hop as it is only when that tier keeps 16 bits (AB-T-0230).
+    @MainActor @Test("a 16-bit image goes on to the next hop at 16 bits only if that hop keeps them")
+    func hopReceivesItsOwnDepth() throws {
+        let deep = try EngineImageCoding.rawImage(from: try Self.deepImage(width: 16, height: 4), keepingDepth: true)
+        #expect(deep.format == .rawRGBA16)
+        #expect(try EngineImageEnhancer.image(deep, forHopKeepingDepth: true) == deep)
+        let eight = try EngineImageEnhancer.image(deep, forHopKeepingDepth: false)
+        #expect(eight.format == .rawBGRA8 && eight.width == 16 && eight.height == 4)
+        #expect(eight == (try EngineImageCoding.rawImage(from: try Self.deepImage(width: 16, height: 4))))
+        let plain = try EngineImageCoding.rawImage(from: try Self.eightBitImage(width: 16, height: 4))
+        #expect(try EngineImageEnhancer.image(plain, forHopKeepingDepth: false) == plain)
+        #expect(try EngineImageEnhancer.image(plain, forHopKeepingDepth: true) == plain)
+    }
+
     @Test(".rawRGBA16 without dimensions is a named error")
     func rawRGBA16WithoutDimensionsThrows() {
         #expect(throws: EngineImageCoding.CodingError.missingDimensions) {
@@ -82,7 +96,7 @@ struct SixteenBitCodingTests {
     }
 
     /// Which tiers keep 16 bits is read from the registered manifests, not a table: RealPLKSR, NERVE and HEART (each
-    /// ≥ 0.2.0) declare `.rawRGBA16`; NAFNet does not yet; an unregistered model never does. No model loads.
+    /// ≥ 0.2.0), NAFNet ≥ 0.6.0 and the face pair ≥ 0.3.0 declare `.rawRGBA16`; an unregistered model never does. No model loads.
     @MainActor @Test("keepsSixteenBits reads the registered surface's declaration")
     func sixteenBitTiersComeFromTheManifests() async {
         #expect(await ForgeEngineService().keepsSixteenBits(.upscaleFidelity) == false)   // not registered
@@ -91,7 +105,11 @@ struct SixteenBitCodingTests {
         #expect(await service.keepsSixteenBits(.upscaleFidelity))
         #expect(await service.keepsSixteenBits(.upscale))        // NERVE: Fast and the ×6/×8 chain's pass 2
         #expect(await service.keepsSixteenBits(.upscaleHEART))
-        #expect(await service.keepsSixteenBits(.restore) == false)
+        #expect(await service.keepsSixteenBits(.restore))          // NAFNet: Optimize's first hop (AB-T-0230)
+        #expect(await service.keepsSixteenBits(.faceRestore))      // GFPGAN
+        #expect(await service.keepsSixteenBits(.faceRestoreVQ))    // RestoreFormer++
+        #expect(await service.keepsSixteenBits(.upscaleGenerative) == false)   // VOSR2 stays 8-bit (AB-T-0230)
+        #expect(await service.keepsSixteenBits(.upscaleNacre) == false)
         #expect(await service.engine.residentPackages.isEmpty)
     }
 

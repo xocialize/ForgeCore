@@ -6,8 +6,9 @@
 //  NERVE for `.fast` (Real-ESRGAN until 2026-09-28), RealPLKSR for `.best` (AB-T-0187).
 //  Both wrappers mirror `.rawBGRA8`, so the whole chain stays raw — no PNG hop between stages.
 //  16 bits (AB-A-0158): each hop sends a deep image as `.rawRGBA16` when that hop's registration keeps 16 bits
-//  (`ForgeEngineService.keepsSixteenBits` — RealPLKSR, NERVE and HEART ≥ 0.2.0), and `.rawBGRA8` otherwise, so a 16-bit source
-//  keeps its depth through every model that can carry it and loses it only at one that cannot.
+//  (`ForgeEngineService.keepsSixteenBits` — NAFNet ≥ 0.6.0, RealPLKSR, NERVE and HEART ≥ 0.2.0), and `.rawBGRA8` otherwise, so a
+//  16-bit source keeps its depth through every model that can carry it and loses it only at one that cannot. The restore
+//  hop's 16-bit answer goes on to the upscale hop as it is only when that tier keeps 16 bits too (`image(_:forHopKeepingDepth:)`).
 //
 
 import Foundation
@@ -117,6 +118,10 @@ public final class EngineImageEnhancer: ImageEnhancer {
         guard let upscaleID = service.packageID(for: model) else {
             throw EnhanceError.unavailable(model, service.outcome(for: model)?.failure)
         }
+        // NAFNet ≥ 0.6.0 hands on `.rawRGBA16` for a deep source; a bare tier that can't take it gets it at 8 bits (the
+        // engine refuses `.rawRGBA16` on a surface that doesn't declare it). The guarded tiers decode it themselves.
+        let current = tier.isStillOnly ? current
+            : try Self.image(current, forHopKeepingDepth: await service.keepsSixteenBits(model))
         let plan = ChainedUpscalePlan.make(requested: requestedScale,
                                            source: .init(width: source.width, height: source.height))
         if plan.isChained {
@@ -130,6 +135,13 @@ public final class EngineImageEnhancer: ImageEnhancer {
         }
         return try await singlePass(current, scale: requestedScale, tier: tier, model: model, upscaleID: upscaleID,
                                     source: source, label: label)
+    }
+
+    /// `image` as the next hop should receive it: as it is, or a `.rawRGBA16` image at 8 bits (`.rawBGRA8`) for a hop that
+    /// doesn't keep 16 bits.
+    static func image(_ image: Image, forHopKeepingDepth keep: Bool) throws -> Image {
+        guard image.format == .rawRGBA16, !keep else { return image }
+        return try EngineImageCoding.rawImage(from: try EngineImageCoding.cgImage(from: image), keepingDepth: false)
     }
 
     /// One bare pass of `model` at `scale` — the non-generative tiers' whole story.

@@ -1,5 +1,5 @@
 {
-  "originHash" : "e79de6dc3930d9d8db4cba101042065f7448f268dc9ae58e14961dcf885e0642",
+  "originHash" : "51a54708e75d41c95639abcec0864b7073a15e1133f8cf688e73d6a0a3f0b777",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -195,8 +195,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-gfpgan-swift.git",
       "state" : {
-        "revision" : "1058a0b2cd450a63dc37a1e2e66738c6e9410f1d",
-        "version" : "0.2.0"
+        "revision" : "0d4bcbacc92a5bf8799c4ba4f801718135b6f074",
+        "version" : "0.3.0"
       }
     },
     {
@@ -231,8 +231,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-nafnet-swift.git",
       "state" : {
-        "revision" : "24975cf80d6785f36f0b46fe9e7f265119c8ce74",
-        "version" : "0.4.0"
+        "revision" : "239268046055c7cf078b5da59dfc7dcc342c79ec",
+        "version" : "0.6.0"
       }
     },
     {
@@ -276,8 +276,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-restoreformer-swift.git",
       "state" : {
-        "revision" : "6c4c347a5ed54bf6ad43d420879fabf69db74aeb",
-        "version" : "0.2.0"
+        "revision" : "6d61c4679561a6fc7614c1ceb76ea910e9766402",
+        "version" : "0.3.0"
       }
     },
     {
