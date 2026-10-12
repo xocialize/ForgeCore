@@ -45,7 +45,8 @@ let package = Package(
         .package(url: "https://github.com/xocialize/ExtractKit.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/ColorizeKit.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/EraseKit.git", from: "0.2.0"),
-        .package(url: "https://github.com/xocialize/MaskKit.git", from: "0.4.0"),
+        // 0.4.1: TextLegibilityGuard.composite keeps 16 bits when either tier did (AB-T-0233).
+        .package(url: "https://github.com/xocialize/MaskKit.git", from: "0.4.1"),
         // 0.13.0 = ImageQualityTarget.encodePNG + VideoQualityTarget.EncodeProfile (the web tier).
         .package(url: "https://github.com/xocialize/media-bridge.git", from: "0.13.0"),
 
@@ -95,7 +96,9 @@ let package = Package(
         // 0.2.1 = footprints re-baselined to the in-app phys_footprint and the VAE tiled above 1024² of output
         // (AB-D-0120, AB-T-0185 step 6); 0.2.0 = in-window convs through MLXExactConv (exact on mlx-swift 0.31.x and
         // 0.32.x); 0.1.0 predates the Winograd fix. VOSR2 is Optimize's Generative tier since 2026-10-07.
-        .package(url: "https://github.com/xocialize/mlx-vosr-swift.git", from: "0.2.1"),
+        // 0.3.0: VOSR2 writes 16 bits (8-bit reference prep, float32 VAE decode; AB-T-0233); 0.2.2 made its VAE attention
+        // cap-safe (AB-T-0218).
+        .package(url: "https://github.com/xocialize/mlx-vosr-swift.git", from: "0.3.0"),
         // The FIDELITY stills tier behind `imageUpscale` — RealPLKSR `4x_webphoto_realplksr` (AB-T-0186 Step 1): a fourth
         // backer, ours end to end (trained on the Commons-SR corpus, weights vendored in the package — no download).
         // Public since 2026-09-28, which keeps this manifest's whole closure public for CI. 0.1.1 = the in-app

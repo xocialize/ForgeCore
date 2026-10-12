@@ -108,8 +108,8 @@ struct SixteenBitCodingTests {
         #expect(await service.keepsSixteenBits(.restore))          // NAFNet: Optimize's first hop (AB-T-0230)
         #expect(await service.keepsSixteenBits(.faceRestore))      // GFPGAN
         #expect(await service.keepsSixteenBits(.faceRestoreVQ))    // RestoreFormer++
-        #expect(await service.keepsSixteenBits(.upscaleGenerative) == false)   // VOSR2 stays 8-bit (AB-T-0230)
-        #expect(await service.keepsSixteenBits(.upscaleNacre) == false)
+        #expect(await service.keepsSixteenBits(.upscaleGenerative))             // VOSR2 ≥ 0.3.0 (AB-T-0233)
+        #expect(await service.keepsSixteenBits(.upscaleNacre) == false)         // Nacre stays 8-bit (AB-D-0128)
         #expect(await service.engine.residentPackages.isEmpty)
     }
 

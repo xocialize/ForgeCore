@@ -144,7 +144,8 @@ error deep inside that package instead of at the boundary.
 | `mlx-nerve-swift` ≥ 0.2.0, `mlx-heart-swift` ≥ 0.2.0 | ✅ | ✅ — Fast, the ×6/×8 chain's pass 2, and the opt-in HEART variant (AB-T-0229) |
 | `mlx-nafnet-swift` ≥ 0.6.0 | ✅ — Optimize runs raw end to end | ✅ — Optimize's restore hop keeps a 16-bit still's depth (AB-T-0230) |
 | `mlx-gfpgan-swift`, `mlx-restoreformer-swift` ≥ 0.3.0 | ✅ | ✅ — the face pass warps, pastes and masks at 16 bits (AB-T-0230) |
-| `mlx-vosr-swift`, `mlx-nacre-swift` | ✅ | ❌ — the generative tiers stay 8-bit (AB-T-0230's decisions) |
+| `mlx-vosr-swift` ≥ 0.3.0 | ✅ | ✅ — VOSR2 writes 16 bits (8-bit reference prep, float32 VAE decode; AB-D-0127, AB-T-0233) |
+| `mlx-nacre-swift` | ✅ | ❌ — Nacre stays 8-bit (AB-D-0128) |
 | BiRefNet, DDColor, LaMa, SEA-RAFT, EdgeTAM | ❌ — PNG leg (tracked as BRIDGE-041) | ❌ |
 
 `Matte` is PNG-only by contract regardless.
@@ -156,7 +157,8 @@ per component) image as `.rawRGBA16` only when asked to. `EngineImageEnhancer` a
 `cgImage(from:)` decodes by format and returns a 16-bit image whenever the package answered in 16 bits. The ×6/×8
 chain's Lanczos fit keeps 16 bits for a deep image. The restore hop's 16-bit answer goes on to the upscale hop as it is
 only when that tier keeps 16 bits too (`EngineImageEnhancer.image(_:forHopKeepingDepth:)`). The generative tiers' text
-guard sends both tiers 8 bits and composites at 8 bits, and those tiers stay 8-bit.
+guard sends each tier its own depth (VOSR2 and NERVE 16 bits, Nacre 8), and MaskKit ≥ 0.4.1 composites at 16 bits when
+either tier answered at 16.
 
 ## Dependency visibility
 

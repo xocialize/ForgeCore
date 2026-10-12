@@ -1,5 +1,5 @@
 {
-  "originHash" : "51a54708e75d41c95639abcec0864b7073a15e1133f8cf688e73d6a0a3f0b777",
+  "originHash" : "8f63e603f4d30a634579a93f33e462a11468083d9054f5dceb895f371d0688d5",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -87,8 +87,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/MaskKit.git",
       "state" : {
-        "revision" : "db4c9dae9e09a67bfb798683e30e979f9338ef26",
-        "version" : "0.4.0"
+        "revision" : "5447fa2ab17e2e2e2d1d8aa5048f684d53b072dd",
+        "version" : "0.4.1"
       }
     },
     {
@@ -357,8 +357,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-vosr-swift.git",
       "state" : {
-        "revision" : "4009e3a78a0dfa38a96f124c542229766d39bc88",
-        "version" : "0.2.1"
+        "revision" : "c18503010d8efcdc55e10c7301ff5fbb2978acd5",
+        "version" : "0.3.0"
       }
     },
     {

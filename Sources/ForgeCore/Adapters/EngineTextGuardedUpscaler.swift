@@ -169,7 +169,9 @@ public final class EngineTextGuardedUpscaler {
         guard let packageID = service.packageID(for: model) else {
             throw GuardedUpscaleError.notRegistered(model, service.outcome(for: model)?.failure)
         }
-        let raw = try EngineImageCoding.rawImage(from: image)
+        // Each tier gets its own depth (AB-T-0233): a 16-bit image goes to a tier that keeps 16 bits (VOSR2 ≥ 0.3.0, NERVE ≥
+        // 0.2.0) as `.rawRGBA16`, and to any other (Nacre) at 8 bits. The composite then keeps 16 bits when either tier did.
+        let raw = try EngineImageCoding.rawImage(from: image, keepingDepth: await service.keepsSixteenBits(model))
         // prepare keyed by capability + package: both tiers back .imageUpscale (see UpscaleDiagnostics).
         _ = try await service.engine.prepare(model.capability, package: packageID)
         let start = Date()
