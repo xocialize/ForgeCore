@@ -141,7 +141,8 @@ error deep inside that package instead of at the boundary.
 | Wrapper | Mirrors `.rawBGRA8` | Keeps 16 bits (`.rawRGBA16`) |
 |---|---|---|
 | `mlx-realplksr-swift` ≥ 0.2.0 | ✅ | ✅ — Best keeps a 16-bit still's depth through the model |
-| `mlx-nafnet-swift`, `mlx-nerve-swift` | ✅ — Optimize runs raw end to end | ❌ — 8 bits for now (AB-A-0158 follow-on) |
+| `mlx-nerve-swift` ≥ 0.2.0, `mlx-heart-swift` ≥ 0.2.0 | ✅ | ✅ — Fast, the ×6/×8 chain's pass 2, and the opt-in HEART variant (AB-T-0229) |
+| `mlx-nafnet-swift` | ✅ — Optimize runs raw end to end | ❌ — 8 bits for now (AB-T-0230) |
 | BiRefNet, DDColor, LaMa, SEA-RAFT, EdgeTAM | ❌ — PNG leg (tracked as BRIDGE-041) | ❌ |
 
 `Matte` is PNG-only by contract regardless.

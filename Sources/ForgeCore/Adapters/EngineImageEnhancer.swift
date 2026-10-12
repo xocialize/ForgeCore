@@ -6,7 +6,7 @@
 //  NERVE for `.fast` (Real-ESRGAN until 2026-09-28), RealPLKSR for `.best` (AB-T-0187).
 //  Both wrappers mirror `.rawBGRA8`, so the whole chain stays raw — no PNG hop between stages.
 //  16 bits (AB-A-0158): each hop sends a deep image as `.rawRGBA16` when that hop's registration keeps 16 bits
-//  (`ForgeEngineService.keepsSixteenBits` — RealPLKSR ≥ 0.2.0 today), and `.rawBGRA8` otherwise, so a 16-bit source
+//  (`ForgeEngineService.keepsSixteenBits` — RealPLKSR, NERVE and HEART ≥ 0.2.0), and `.rawBGRA8` otherwise, so a 16-bit source
 //  keeps its depth through every model that can carry it and loses it only at one that cannot.
 //
 

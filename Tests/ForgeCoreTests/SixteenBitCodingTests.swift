@@ -81,15 +81,16 @@ struct SixteenBitCodingTests {
         }
     }
 
-    /// Which tiers keep 16 bits is read from the registered manifests, not a table: RealPLKSR (≥ 0.2.0) declares
-    /// `.rawRGBA16`; NERVE and NAFNet do not yet; an unregistered model never does. No model loads.
+    /// Which tiers keep 16 bits is read from the registered manifests, not a table: RealPLKSR, NERVE and HEART (each
+    /// ≥ 0.2.0) declare `.rawRGBA16`; NAFNet does not yet; an unregistered model never does. No model loads.
     @MainActor @Test("keepsSixteenBits reads the registered surface's declaration")
     func sixteenBitTiersComeFromTheManifests() async {
         #expect(await ForgeEngineService().keepsSixteenBits(.upscaleFidelity) == false)   // not registered
         let service = ForgeEngineService()
         await service.registerAll()
         #expect(await service.keepsSixteenBits(.upscaleFidelity))
-        #expect(await service.keepsSixteenBits(.upscale) == false)
+        #expect(await service.keepsSixteenBits(.upscale))        // NERVE: Fast and the ×6/×8 chain's pass 2
+        #expect(await service.keepsSixteenBits(.upscaleHEART))
         #expect(await service.keepsSixteenBits(.restore) == false)
         #expect(await service.engine.residentPackages.isEmpty)
     }

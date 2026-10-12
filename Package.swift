@@ -81,7 +81,8 @@ let package = Package(
         // and weights trained only on a CC0 corpus (AB-D-0106), weights vendored in the package — no download. It
         // REPLACED Real-ESRGAN as `.upscale`; `mlx-realesrgan-swift` stays in the graph through NERVE's own dependency on
         // its shared tile driver, but ForgeCore no longer registers a Real-ESRGAN package.
-        .package(url: "https://github.com/xocialize/mlx-nerve-swift.git", from: "0.1.0"),
+        // 0.2.0 = 16 bits end to end (AB-T-0229): Fast and the ×6/×8 chain's pass 2 keep a 16-bit source's depth.
+        .package(url: "https://github.com/xocialize/mlx-nerve-swift.git", from: "0.2.0"),
     // The quality tier behind `imageUpscale` — a second backer, not a replacement.
     // 0.10.0 = WeightSourcing (AB-T-0197): the engine materializes SeedVR2 into the attached model store with `.downloading`
     // progress; a v0.9.x in-store snapshot is honored, then adopted by rename, never re-downloaded. An app still on ≤ 0.9.x
@@ -105,7 +106,8 @@ let package = Package(
         // from mlx-community/HEART-fp16 (34 MB per variant). Registered as `.upscaleHEART` — reachable, never a default
         // route: the crossover (AB-T-0190) gave RealPLKSR DISTS at 12/12 rungs, HEART PSNR at 12/12 and a SSIMULACRA2 tie,
         // at 4.5–5× the cost, and the operator chose the opt-in slot (AB-A-0128). Public since 2026-09-28.
-        .package(url: "https://github.com/xocialize/mlx-heart-swift.git", from: "0.1.0"),
+        // 0.2.0 = 16 bits end to end (AB-T-0229), with a float32 stem and tail on its fp16 lane.
+        .package(url: "https://github.com/xocialize/mlx-heart-swift.git", from: "0.2.0"),
         // Nacre v1 (AB-A-0133) — the OPT-IN provenance-clean GENERATIVE variant beside VOSR2: our own clean-room
         // ResShift-class 4× SR (118.6 M SwinUNet + 4-step residual shift in CompVis VQ-f4's latent, Apache-2.0 code AND
         // weights, trained only on Wikimedia Commons CC0/PD/CC BY; AB-R-0396). VOSR2's corpus is undisclosed (AB-D-0105);

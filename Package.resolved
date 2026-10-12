@@ -1,5 +1,5 @@
 {
-  "originHash" : "046444221a3edf1895329d1982ef0020eff42699879c36fec51affae7c463d37",
+  "originHash" : "e79de6dc3930d9d8db4cba101042065f7448f268dc9ae58e14961dcf885e0642",
   "pins" : [
     {
       "identity" : "colorizekit",
@@ -204,8 +204,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-heart-swift.git",
       "state" : {
-        "revision" : "193099e74b1e135f7f47db1a4964b28dbacfa67b",
-        "version" : "0.1.0"
+        "revision" : "55b92ff8072b8b7401d56ecd39bb5430d2157e24",
+        "version" : "0.2.0"
       }
     },
     {
@@ -240,8 +240,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/mlx-nerve-swift.git",
       "state" : {
-        "revision" : "bcfe71eba07dd25b4d29317471404858fb462488",
-        "version" : "0.1.0"
+        "revision" : "fa4dc5381574c7eb9ae8ef9643a214f04534ef16",
+        "version" : "0.2.0"
       }
     },
     {
