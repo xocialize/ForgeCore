@@ -52,6 +52,10 @@ public struct ForgeCapabilities {
     /// optimize receipt — AB-T-0045 step 4). An app that just wants faster optimize should leave
     /// `hintProvider` nil: the Kit's behavioral class ratchet is the fallback and is free.
     public let contentHint: EngineContentHintProvider
+    /// Generative Fill and Expand — the service's `GenerativeFillTier` model (SenseNova-U1.5 8step-v2 by default) through
+    /// the Image Engine's fill route, LaMa as its fallback and seam bridge. `fill(_:mask:prompt:)` is the editor's
+    /// `GenerativeFillProvider` seam; `expand(…)` its sibling. Built after `registerAll()`, its `name` names the tier.
+    public let generativeFill: EngineGenerativeFillProvider
 
     /// The four V1 capabilities and whether the models they need are registered. A capability with an
     /// unavailable Tier-2 model is not necessarily dead — Extract and Erase still have their Tier-0/1
@@ -89,5 +93,6 @@ public struct ForgeCapabilities {
         self.promptMask = EnginePromptMaskProvider(service: service)
         self.promptMaskQuality = EnginePromptMaskProvider(service: service, model: .promptMaskQuality)
         self.contentHint = EngineContentHintProvider(service: service)
+        self.generativeFill = EngineGenerativeFillProvider(service: service)
     }
 }

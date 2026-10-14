@@ -173,6 +173,15 @@ let package = Package(
         // label names) and that vocabulary is hand-object actions, semantically wrong for signage.
         // Never build a label→class mapping from it.
         .package(url: "https://github.com/xocialize/mlx-vjepa2-swift.git", from: "0.5.0"),
+        // Generative Fill / Expand (AB-A-0166, AB-D-0141) — `.generativeFill`, the backer `EngineGenerativeFillProvider` runs.
+        // SenseNova-U1.5-8B-MoT on the 8-step V2 adapter (Apache-2.0 weights, MIT port) is the model on every memory tier; the
+        // bake-off measured it through the Image Engine's fill route (AB-R-0534). 0.5.1 made the distill tiers serve
+        // imageEdit (AB-R-0490); 0.5.2 = the load fix (int4 edit peak 14.7 → 12.2 GB, AB-R-0536), the floor this tier needs.
+        .package(url: "https://github.com/xocialize/sensenova-u1-swift.git", from: "0.5.2"),
+        // FLUX.2-klein-4B (Apache-2.0 weights, MIT port): the documented 16 GB fallback in AB-D-0141 — int4 with the text
+        // encoder evicted at a ≤ 768² window (8.9 GB MLX peak). Linked so a host switches to it by configuration
+        // (`GenerativeFillTiers`), never by code. 0.8.1 = the edit surface with `evictEncoder`'s declared light footprint.
+        .package(url: "https://github.com/xocialize/flux2-klein-swift.git", from: "0.8.1"),
     ],
     targets: [
         .target(
@@ -210,6 +219,8 @@ let package = Package(
                 .product(name: "MLXEdgeTAM", package: "mlx-edgetam-swift"),
                 .product(name: "MLXRIFE", package: "mlx-rife-swift"),
                 .product(name: "MLXVJEPA2", package: "mlx-vjepa2-swift"),
+                .product(name: "MLXSenseNovaU1", package: "sensenova-u1-swift"),
+                .product(name: "MLXKlein", package: "flux2-klein-swift"),
             ]
         ),
         // ⚠️ Run with `swift test --build-system swiftbuild`. Importing MLX inherits the metallib
@@ -221,6 +232,8 @@ let package = Package(
             .product(name: "MLXHEART", package: "mlx-heart-swift"),   // … and HEART's (the opt-in variant)
             .product(name: "MLXNacre", package: "mlx-nacre-swift"),   // … and Nacre's (the opt-in generative variant)
             .product(name: "MLXFlashVSR", package: "mlx-flashvsr-swift"), // … and FlashVSR's (the live-action video tier)
+            .product(name: "MLXSenseNovaU1", package: "sensenova-u1-swift"), // GenerativeFillTierTests: the fill tiers serve imageEdit
+            .product(name: "MLXKlein", package: "flux2-klein-swift"),           // … and the documented 16 GB fallback's manifest
         ]),
     ]
 )

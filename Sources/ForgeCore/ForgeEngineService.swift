@@ -193,6 +193,19 @@ public enum ForgeModel: String, CaseIterable, Sendable {
     // signage. Never map a tag to a content class — `EngineContentHintProvider` reads the embedding.
     case contentClassify   // V-JEPA2 ViT-L
 
+    // ── generativeFill (AB-A-0166 / AB-D-0141) ──
+    // Registered 2026-10-14. The edit model behind `EngineGenerativeFillProvider` (Generative Fill and Expand), run through
+    // the Image Engine's own fill route (`GenerativeFill/`): magenta marker, paint guard, harmonize, composite through the
+    // mask. WHICH model is configuration, not code — the service's `generativeFillTier` (`GenerativeFillTiers`, keyed by
+    // unified memory) — so one registration id, `generative-fill`, serves every tier. The default is AB-D-0141 as amended:
+    // SenseNova-U1.5-8B-MoT on the 8-step V2 adapter on every tier (16 GB 4-bit ≤ 768², 24 GB 4-bit ≤ 1024², 32 GB+ 8-bit
+    // ≤ 1024²), which beat FLUX.2-klein-4B through that route on fill, extend and remove (AB-R-0534); Klein-4B int4 with the
+    // encoder evicted is the documented 16 GB fallback (`GenerativeFillTiers.kleinAt16GB`). ⚠️ SenseNova declares
+    // `chipFloor: .max` (measured on M5 Max only), so the engine refuses it on base and Pro chips until sensenova-u1-swift
+    // relaxes that; and its int4 declaration (12.2 + 4.5 GB) is refused on a 16 GB budget until AB-T-0278's 16 GB
+    // footprint lands. Both refusals surface as this registration's outcome / admissibility, never as a silent swap.
+    case generativeFill    // SenseNova-U1.5 8step-v2 (int4/int8) or FLUX.2-klein-4B — per GenerativeFillTier
+
     public var modelName: String {
         switch self {
         case .restore:    return "NAFNet"
@@ -221,6 +234,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .defectDetect:     return "BOPBTL"
         case .frameInterpolate: return "RIFE"
         case .contentClassify:  return "V-JEPA2"
+        case .generativeFill:   return "SenseNova-U1.5 / FLUX.2-klein-4B"
         }
     }
 
@@ -255,6 +269,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .defectDetect: return .defectDetect
         case .frameInterpolate: return .frameInterpolate
         case .contentClassify: return .contentClassify
+        case .generativeFill: return .imageEdit
         }
     }
 }
@@ -423,19 +438,33 @@ public final class ForgeEngineService {
     /// Outcome per external registration, in injection order, once `registerAll()` has run.
     public private(set) var externalOutcomes: [ExternalRegistrationOutcome] = []
 
+    /// The Generative Fill tier `.generativeFill` registers: which model, at which quant, with which window cap. nil = no
+    /// tier for this Mac (below 16 GB), and `.generativeFill` reports that as its outcome. The default is
+    /// `GenerativeFillTiers.forgeDefault` for this Mac's unified memory; a host that emulates a smaller Mac, or switches a
+    /// tier after mlx-image's int4 gate (AB-A-0178), sets it from its own `GenerativeFillTiers`. A change takes effect at
+    /// the next `registerAll()`, which re-registers the same id and evicts the old model.
+    public var generativeFillTier: GenerativeFillTier?
+
+    /// The tier `.generativeFill` is registered with right now — what `EngineGenerativeFillProvider` runs and reports.
+    public private(set) var registeredGenerativeFillTier: GenerativeFillTier?
+
     /// - Parameters:
     ///   - policy: license gate. Leave at `.permissiveOnly` for a shipping product; a research build
     ///     may widen it.
     ///   - enforcement: leave `.blocking`. See the note on `engine`.
     ///   - restoreVariant: see `restoreVariant`. The default changed to `.signage` on evidence.
     ///   - bankResidencyBudgetBytes: see the property. `nil` keeps every bank resident.
+    ///   - generativeFillTier: see the property. Defaults to AB-D-0141's tier for this Mac's unified memory.
     public init(policy: LicensePolicy = .permissiveOnly,
                 enforcement: LicenseEnforcement = .blocking,
                 restoreVariant: NAFNetVariant = .signage,
                 videoTemporalTier: VideoTemporalTier = .default,
                 bankResidencyBudgetBytes: Int? = nil,
                 externalRegistrations: [ExternalRegistration] = [],
-                governor: MemoryGovernor? = nil) {
+                governor: MemoryGovernor? = nil,
+                generativeFillTier: GenerativeFillTier? = GenerativeFillTiers.forgeDefault.tier(
+                    forPhysicalMemory: ProcessInfo.processInfo.physicalMemory)) {
+        self.generativeFillTier = generativeFillTier
         // `governor` nil = the engine's device default. A fixed budget is for drills: an app that declares a canvas
         // (ForgeExternalTenant) proves its shrink path under a budget that only fits if the canvas sheds.
         self.engine = MLXServeEngine(policy: policy, licenseEnforcement: enforcement, governor: governor)
@@ -735,6 +764,17 @@ public final class ForgeEngineService {
                 // provenance for the calibration rows.
                 id = try await registerRecording(model, VJEPA2ContentClassifyPackage.registration,
                                                         configuration: VJEPA2Configuration())
+            case .generativeFill:
+                // The tier's model, its package defaults otherwise (`GenerativeFillModel.registration`). One explicit id for
+                // every tier: a tier change re-registers it, which replaces the old package and evicts its resident
+                // (MLXServeEngine.swift:729) — the same id is also what a host's download offer and tier gate key on.
+                // A failed switch must not leave the previous tier's id answering for the new one.
+                packageIDs[model] = nil
+                registeredGenerativeFillTier = nil
+                guard let tier = generativeFillTier else { throw NoGenerativeFillTier() }
+                let (registration, configuration) = tier.model.registration
+                id = try await registerRecording(model, registration, configuration: configuration, id: "generative-fill")
+                registeredGenerativeFillTier = tier
             case .qualityScore:
                 // `maxPatches` is a coverage/cost knob, not a quality knob: the scorer mean-pools up to
                 // N native-scale 224² patches. ⚠️ **The default 8 is too few for a 2048² frame** — 8
@@ -752,6 +792,11 @@ public final class ForgeEngineService {
         } catch {
             return RegistrationOutcome(model: model, packageID: nil, failure: Self.describe(error))
         }
+    }
+
+    /// `.generativeFill`'s outcome on a Mac below every Generative Fill tier.
+    struct NoGenerativeFillTier: Error, CustomStringConvertible {
+        var description: String { "no Generative Fill tier for this Mac's memory (AB-D-0141 starts at 16 GB)" }
     }
 
     /// `engine.register`, remembering the configuration for `admissibility(for:)`.
