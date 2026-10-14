@@ -140,11 +140,11 @@ error deep inside that package instead of at the boundary.
 
 | Wrapper | Mirrors `.rawBGRA8` | Keeps 16 bits (`.rawRGBA16`) |
 |---|---|---|
-| `mlx-realplksr-swift` ≥ 0.2.0 | ✅ | ✅ — Best keeps a 16-bit still's depth through the model |
-| `mlx-nerve-swift` ≥ 0.2.0, `mlx-heart-swift` ≥ 0.2.0 | ✅ | ✅ — Fast, the ×6/×8 chain's pass 2, and the opt-in HEART variant (AB-T-0229) |
-| `mlx-nafnet-swift` ≥ 0.6.0 | ✅ — Optimize runs raw end to end | ✅ — Optimize's restore hop keeps a 16-bit still's depth (AB-T-0230) |
+| `mlx-realplksr-swift` ≥ 0.2.1 | ✅ | ✅ — Best keeps a 16-bit still's depth through the model; ×2 is a registered Lanczos reduction of the ×4 (AB-T-0225) |
+| `mlx-nerve-swift` ≥ 0.2.1, `mlx-heart-swift` ≥ 0.2.2 | ✅ | ✅ — Fast, the ×6/×8 chain's pass 2, and the opt-in HEART variant (AB-T-0229) |
+| `mlx-nafnet-swift` ≥ 0.6.1 | ✅ — Optimize runs raw end to end | ✅ — Optimize's restore hop keeps a 16-bit still's depth (AB-T-0230) |
 | `mlx-gfpgan-swift`, `mlx-restoreformer-swift` ≥ 0.3.1 | ✅ | ✅ — the face pass warps, pastes and masks at 16 bits (AB-T-0230); no dark line at the image edge under a close-up's crop (AB-T-0227) |
-| `mlx-vosr-swift` ≥ 0.3.0 | ✅ | ✅ — VOSR2 writes 16 bits (8-bit reference prep, float32 VAE decode; AB-D-0127, AB-T-0233) |
+| `mlx-vosr-swift` ≥ 0.3.1 | ✅ | ✅ — VOSR2 writes 16 bits (8-bit reference prep, float32 VAE decode; AB-D-0127, AB-T-0233) |
 | `mlx-nacre-swift` | ✅ | ❌ — Nacre stays 8-bit (AB-D-0128) |
 | BiRefNet, DDColor, LaMa, SEA-RAFT, EdgeTAM | ❌ — PNG leg (tracked as BRIDGE-041) | ❌ |
 

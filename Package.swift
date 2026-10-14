@@ -59,16 +59,22 @@ let package = Package(
 
         // Model wrappers — the heavy pins.
         // 0.6.0: NAFNet keeps 16 bits (`.rawRGBA16`, AB-T-0230), so Optimize's restore hop no longer cuts a 16-bit source to 8.
-        .package(url: "https://github.com/xocialize/mlx-nafnet-swift.git", from: "0.6.0"),
+        // 0.5.0 declared its weights to the engine (AB-T-0222, AB-A-0154). 0.6.1: the ending conv no longer reaches mlx's
+        // channel-pad helper, whose freed fill value aborts the process with "Invalid Resource" under the engine's capped
+        // buffer pool (AB-T-0214, AB-R-0511).
+        .package(url: "https://github.com/xocialize/mlx-nafnet-swift.git", from: "0.6.1"),
         // The frame-restore wave (BRIDGE-066) + face pair (064-face) + relight (BRIDGE-067) —
         // registered 2026-07-31, ending the state where shipped packages were invisible to apps.
         // FFTformer (`mlx-fftformer-swift`) was in this wave and was UNREGISTERED 2026-10-06 (AB-D-0111): worse than
         // doing nothing on real blur (−0.02 ± 0.22 dB on RealBlur-J, 41 % of images hurt, worst −18.70 dB; AB-R-0331),
         // with Restormer `.motionDeblur` the measured default. The package stays published for anyone who wants GoPro.
-        .package(url: "https://github.com/xocialize/mlx-restormer-swift.git", from: "0.1.0"),
-        .package(url: "https://github.com/xocialize/mlx-drunet-swift.git", from: "0.1.0"),
-        .package(url: "https://github.com/xocialize/mlx-scunet-swift.git", from: "0.1.1"),
-        .package(url: "https://github.com/xocialize/mlx-cidnet-swift.git", from: "0.1.0"),
+        // Restore-fleet floors = the AB-A-0112 patches (AB-A-0155): load() reads the weights the engine materialized instead
+        // of fetching them a second time through HubApi into `<root>/models/`. CIDNet 0.1.2 also reflect-pads to a multiple
+        // of 8: below it, relighting an image whose side isn't one hits an MLX concatenate fatalError (AB-T-0223).
+        .package(url: "https://github.com/xocialize/mlx-restormer-swift.git", from: "0.1.1"),
+        .package(url: "https://github.com/xocialize/mlx-drunet-swift.git", from: "0.1.1"),
+        .package(url: "https://github.com/xocialize/mlx-scunet-swift.git", from: "0.1.2"),
+        .package(url: "https://github.com/xocialize/mlx-cidnet-swift.git", from: "0.1.2"),
         // Face pair floors = the MLXExactConv releases (AB-A-0119, 2026-10-07). mlx's GPU Winograd conv2d is lossy on
         // in-window 3×3 convs; 0.1.1 routed around it through conv3d, which mlx-swift 0.32 defeats again (gfpgan's lane
         // fails at 1.01e-3 there). 0.2.0 routes through MLXExactConv — exact on 0.31.x and 0.32.x (7.5e-7) — and the
@@ -77,7 +83,7 @@ let package = Package(
         // line along the image edge when a face's crop extends past the frame — every close-up (AB-T-0227).
         .package(url: "https://github.com/xocialize/mlx-gfpgan-swift.git", from: "0.3.1"),
         .package(url: "https://github.com/xocialize/mlx-restoreformer-swift.git", from: "0.3.1"),
-        .package(url: "https://github.com/xocialize/mlx-bopbtl-swift.git", from: "0.2.0"),
+        .package(url: "https://github.com/xocialize/mlx-bopbtl-swift.git", from: "0.2.1"),   // 0.2.1: no second download (AB-A-0155)
         // Category A Kit — RestoreTier2 is the provider-protocol seam this package implements
         // (BRIDGE-070). One-way: the Kit never depends back on ForgeCore.
         .package(url: "https://github.com/xocialize/ForgeRestoreKit.git", from: "0.10.0"),
@@ -86,41 +92,49 @@ let package = Package(
         // REPLACED Real-ESRGAN as `.upscale`; `mlx-realesrgan-swift` stays in the graph through NERVE's own dependency on
         // its shared tile driver, but ForgeCore no longer registers a Real-ESRGAN package.
         // 0.2.0 = 16 bits end to end (AB-T-0229): Fast and the ×6/×8 chain's pass 2 keep a 16-bit source's depth.
-        .package(url: "https://github.com/xocialize/mlx-nerve-swift.git", from: "0.2.0"),
+        // 0.2.1: its ×1 / ×3 routes reduce with a vImage Lanczos, not a misregistered CoreGraphics draw (AB-T-0232, AB-A-0163).
+        .package(url: "https://github.com/xocialize/mlx-nerve-swift.git", from: "0.2.1"),
     // The quality tier behind `imageUpscale` — a second backer, not a replacement.
     // 0.10.0 = WeightSourcing (AB-T-0197): the engine materializes SeedVR2 into the attached model store with `.downloading`
     // progress; a v0.9.x in-store snapshot is honored, then adopted by rename, never re-downloaded. An app still on ≤ 0.9.x
     // that shares the store would re-download after adoption — rebuild sharers together.
-    .package(url: "https://github.com/xocialize/mlx-seedvr2-swift.git", from: "0.10.0"),
+    // 0.10.2: the VAE conv_in runs off mlx's channel-pad helper ("Invalid Resource", AB-T-0214).
+    .package(url: "https://github.com/xocialize/mlx-seedvr2-swift.git", from: "0.10.2"),
         // The GENERATIVE stills tier behind `imageUpscale` — VOSR2 (AB-T-0184/AB-T-0185): a third backer, beside
         // the fast tier (Real-ESRGAN then, NERVE since 2026-09-28) and SeedVR2 (quality/diffusion), never a replacement.
         // 0.2.1 = footprints re-baselined to the in-app phys_footprint and the VAE tiled above 1024² of output
         // (AB-D-0120, AB-T-0185 step 6); 0.2.0 = in-window convs through MLXExactConv (exact on mlx-swift 0.31.x and
         // 0.32.x); 0.1.0 predates the Winograd fix. VOSR2 is Optimize's Generative tier since 2026-10-07.
         // 0.3.0: VOSR2 writes 16 bits (8-bit reference prep, float32 VAE decode; AB-T-0233); 0.2.2 made its VAE attention
-        // cap-safe (AB-T-0218).
-        .package(url: "https://github.com/xocialize/mlx-vosr-swift.git", from: "0.3.0"),
+        // cap-safe (AB-T-0218). 0.3.1: floors mlx-exact-conv-swift 0.1.1, whose 0.1.0 padded every exact conv straight into
+        // mlx's channel-pad helper — the "Invalid Resource" abort (AB-T-0214).
+        .package(url: "https://github.com/xocialize/mlx-vosr-swift.git", from: "0.3.1"),
         // The FIDELITY stills tier behind `imageUpscale` — RealPLKSR `4x_webphoto_realplksr` (AB-T-0186 Step 1): a fourth
         // backer, ours end to end (trained on the Commons-SR corpus, weights vendored in the package — no download).
         // Public since 2026-09-28, which keeps this manifest's whole closure public for CI. 0.1.1 = the in-app
         // phys_footprint re-baseline (0.1 + 8.6 GB, AB-T-0019): below it the governor charges a derived 12.55 GB, which
         // on a 16 GB Mac (budget ≈ 12.7 GB) admits Optimize's Best only after evicting everything else.
         // 0.2.0 = 16 bits end to end (AB-A-0158): the first tier that keeps a 16-bit source's depth through the model.
-        .package(url: "https://github.com/xocialize/mlx-realplksr-swift.git", from: "0.2.0"),
+        // 0.2.1: ×2 is a vImage Lanczos reduction of the ×4, registered across the frame; the CoreGraphics draw before it
+        // drifted ±0.26 px toward the edges and lost 1.74 dB on drawn content (AB-T-0225, AB-A-0163).
+        .package(url: "https://github.com/xocialize/mlx-realplksr-swift.git", from: "0.2.1"),
         // HEART (AB-T-0189 / AB-R-0379) — the OPT-IN fidelity variant behind RealPLKSR: Phips/HEART, Apache-2.0 code and
         // weights trained only on a CC0 corpus (AB-D-0106), 16.7 M-param HAT-iLN window attention; weights materialize
         // from mlx-community/HEART-fp16 (34 MB per variant). Registered as `.upscaleHEART` — reachable, never a default
         // route: the crossover (AB-T-0190) gave RealPLKSR DISTS at 12/12 rungs, HEART PSNR at 12/12 and a SSIMULACRA2 tie,
         // at 4.5–5× the cost, and the operator chose the opt-in slot (AB-A-0128). Public since 2026-09-28.
-        // 0.2.0 = 16 bits end to end (AB-T-0229), with a float32 stem and tail on its fp16 lane.
-        .package(url: "https://github.com/xocialize/mlx-heart-swift.git", from: "0.2.0"),
+        // 0.2.0 = 16 bits end to end (AB-T-0229), with a float32 stem and tail on its fp16 lane. 0.2.1: the registered
+        // Lanczos ×2 (2.81 dB back, AB-A-0163); 0.2.2: conv_before_upsample off mlx's channel-pad helper (AB-T-0214).
+        .package(url: "https://github.com/xocialize/mlx-heart-swift.git", from: "0.2.2"),
         // Nacre v1 (AB-A-0133) — the OPT-IN provenance-clean GENERATIVE variant beside VOSR2: our own clean-room
         // ResShift-class 4× SR (118.6 M SwinUNet + 4-step residual shift in CompVis VQ-f4's latent, Apache-2.0 code AND
         // weights, trained only on Wikimedia Commons CC0/PD/CC BY; AB-R-0396). VOSR2's corpus is undisclosed (AB-D-0105);
         // Nacre's case is provenance, not peak quality. Registered as `.upscaleNacre` — reachable, never a default route.
         // Weights materialize from xocialize/nacre-v1-mlx (fp16 lane 348 MB). 0.1.4 = the in-app footprint declared per
         // tile (AB-R-0399); 0.1.2/0.1.3 under-declare and 0.1.0/0.1.1 carry the CLI split. Public since 2026-10-05.
-        .package(url: "https://github.com/xocialize/mlx-nacre-swift.git", from: "0.1.4"),
+        // 0.1.5: its ×2 is the registered Lanczos reduction (AB-T-0232, AB-A-0163); 0.1.6: the input conv runs off mlx's
+        // channel-pad helper (AB-T-0214).
+        .package(url: "https://github.com/xocialize/mlx-nacre-swift.git", from: "0.1.6"),
         // FlashVSR v1.1 — the LIVE-ACTION generative tier behind `videoUpscale` (registered 2026-10-04): one-step streaming
         // diffusion VSR (OpenImagingLab, Apache-2.0 code AND weights), ported to Swift/MLX with a Metal block-sparse attention
         // kernel; weights materialize from mlx-community/FlashVSR-v1.1-bf16 (3.5 GB). ⚠️ Generative: it renders anime and
@@ -138,10 +152,14 @@ let package = Package(
         // 0.4.0 = WeightSourcing (AB-T-0196): the backbone materializes into the attached store with `.downloading`
         // progress; a pre-0.4.0 `<store>/SigLIP2/` copy is adopted by move, a store-less cache copy is re-materialized.
         .package(url: "https://github.com/xocialize/mlx-siglip2-iqa-swift.git", from: "0.4.0"),
-        .package(url: "https://github.com/xocialize/mlx-ddcolor-swift.git", from: "0.2.0"),
+        // 0.3.0: all three checkpoints declared as WeightSources, so the engine downloads them before load() (AB-T-0222,
+        // AB-A-0154). First colorize fetches ~1.02 GB up front.
+        .package(url: "https://github.com/xocialize/mlx-ddcolor-swift.git", from: "0.3.0"),
         // 0.3.0 = LaMa's FFC convs through MLXExactConv, exact on mlx-swift 0.31.x AND 0.32.x. 0.2.1's conv3d route
         // (the AB-A-0119 Winograd fix) is defeated on 0.32, which the app ships (`wave-0.32-approval-batch.md` §B).
-        .package(url: "https://github.com/xocialize/mlx-lama-swift.git", from: "0.3.1"),   // 0.3.1: LaMa-fp32 weights (bf16 cast colour fills pink, AB-R-0451)
+        // 0.3.1: LaMa-fp32 weights (bf16 cast colour fills pink, AB-R-0451). 0.4.0: LaMa and MI-GAN declared as WeightSources,
+        // engine-materialized (AB-T-0222, AB-A-0154).
+        .package(url: "https://github.com/xocialize/mlx-lama-swift.git", from: "0.4.0"),
         .package(url: "https://github.com/xocialize/mlx-sea-raft-swift.git", from: "0.5.0"),
         .package(url: "https://github.com/xocialize/mlx-edgetam-swift.git", from: "0.6.0"),
         // frameInterpolate — RIFE 4.25 (AB-T-0038). Ported and parity-locked 2026-06-18, but no
