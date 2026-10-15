@@ -3,7 +3,8 @@
 //  ForgeCore
 //
 //  ForgeOptimizerKit's `ImageEnhancer` seam, engine-backed: NAFNet restore → the upscale tier the caller chose —
-//  NERVE for `.fast` (Real-ESRGAN until 2026-09-28), RealPLKSR for `.best` (AB-T-0187).
+//  NERVE for `.fast` (Real-ESRGAN until 2026-09-28), RealPLKSR for `.best` (AB-T-0187), and for `.instant` Anime4K's
+//  upscale-only VL on Metal shaders, outside the engine (AB-D-0146).
 //  Both wrappers mirror `.rawBGRA8`, so the whole chain stays raw — no PNG hop between stages.
 //  16 bits (AB-A-0158): each hop sends a deep image as `.rawRGBA16` when that hop's registration keeps 16 bits
 //  (`ForgeEngineService.keepsSixteenBits` — NAFNet ≥ 0.6.0, RealPLKSR, NERVE and HEART ≥ 0.2.0), and `.rawBGRA8` otherwise, so a
@@ -15,6 +16,7 @@ import Foundation
 import CoreGraphics
 import OSLog
 import ForgeOptimizerKit
+import Anime4KMetal
 import MaskKit
 import MLXServeCore
 import MLXToolKit
@@ -33,6 +35,10 @@ public final class EngineImageEnhancer: ImageEnhancer {
     /// records what came back so the receipt describes the output rather than the request.
     public private(set) var lastAppliedScale: Int?
 
+    /// The Instant tier's backer, created on first use. It holds compiled Metal pipelines only; its textures are released
+    /// after every call.
+    private var instant: Anime4KUpscaler?
+
     public init(service: ForgeEngineService) {
         self.service = service
     }
@@ -48,15 +54,23 @@ public final class EngineImageEnhancer: ImageEnhancer {
     /// `.liveAction` maps to FlashVSR (`.upscaleVideoLiveAction`) so the receipt mapping covers every tier, but this
     /// enhancer never runs it: it is a whole-clip video tier served by `EngineVideoUpscaler`, and a still asked for it
     /// is refused (by the Kit first, and by `availability(of:)` / `enhanceReporting` here too).
-    public static func model(for tier: UpscaleTier) -> ForgeModel {
+    ///
+    /// `.instant` has no registration, so it maps to nil (0.40.0). It is the efficiency tier (AB-D-0146): Anime4K's
+    /// upscale-only VL network as Metal compute shaders (`anime4k-metal`), run directly on the GPU with no engine, no
+    /// admission, no download and no memory tier. It reports the model `instantModelName`.
+    public static func model(for tier: UpscaleTier) -> ForgeModel? {
         switch tier {
         case .fast: return .upscale
         case .best: return .upscaleFidelity
         case .liveAction: return .upscaleVideoLiveAction
         case .generative: return .upscaleGenerative
         case .generativeClean: return .upscaleNacre
+        case .instant: return nil
         }
     }
+
+    /// What the receipt calls the Instant tier's pixels.
+    public static let instantModelName = "Anime4K VL"
 
     /// The inverse of `model(for:)` — the tier a registration IS, which is what the receipt reports back.
     public static func tier(for model: ForgeModel) -> UpscaleTier? {
@@ -98,9 +112,13 @@ public final class EngineImageEnhancer: ImageEnhancer {
             lastAppliedScale = nil
             return EnhanceOutcome(image: image)
         }
+        if tier == .instant {
+            return try await instantUpscale(image, scale: requestedScale, label: "Conform")
+        }
+        guard let model = Self.model(for: tier) else { throw EnhanceError.notAnEngineTier(tier) }
         // The tier's own registration decides the depth it is sent (AB-A-0158): a deep source stays 16-bit only into a
         // model that declares it.
-        let keep = await service.keepsSixteenBits(Self.model(for: tier))
+        let keep = await service.keepsSixteenBits(model)
         return try await upscale(try EngineImageCoding.rawImage(from: image, keepingDepth: keep), scale: requestedScale,
                                  tier: tier, source: (image.width, image.height), label: "Conform")
     }
@@ -114,7 +132,11 @@ public final class EngineImageEnhancer: ImageEnhancer {
         guard !tier.isVideoOnly else {
             throw EnhanceError.videoOnlyTier(tier)
         }
-        let model = Self.model(for: tier)
+        if tier == .instant {
+            return try await instantUpscale(try EngineImageCoding.cgImage(from: current), scale: requestedScale,
+                                            label: label)
+        }
+        guard let model = Self.model(for: tier) else { throw EnhanceError.notAnEngineTier(tier) }
         guard let upscaleID = service.packageID(for: model) else {
             throw EnhanceError.unavailable(model, service.outcome(for: model)?.failure)
         }
@@ -224,6 +246,31 @@ public final class EngineImageEnhancer: ImageEnhancer {
                               upscaleRoute: first.upscaleRoute)
     }
 
+    /// The Instant tier (AB-D-0146): Anime4K VL doubles the image on the GPU, off the main actor, keeping its depth and
+    /// alpha. ×2, ×4 and ×8 are one, two and three doublings; ×6 is ×8 fitted down with Lanczos, or ×4 fitted up when the
+    /// ×8 intermediate would pass `ChainedUpscalePlan.intermediatePixelCap` (AB-D-0119's rule, named in the receipt).
+    /// Unlike the engine tiers' chains, every pass is the same tier, so Instant needs no model at any factor.
+    private func instantUpscale(_ image: CGImage, scale requestedScale: Int, label: String) async throws -> EnhanceOutcome {
+        guard Anime4KUpscaler.isAvailable else {
+            throw EnhanceError.instantUnavailable(Anime4KUpscaler.unavailableReason ?? "no Metal device")
+        }
+        let upscaler: Anime4KUpscaler
+        if let existing = instant { upscaler = existing } else { upscaler = try Anime4KUpscaler(); instant = upscaler }
+        let plan = InstantUpscalePlan.make(requested: requestedScale,
+                                           source: .init(width: image.width, height: image.height))
+        let start = Date()
+        var out = try await Task.detached(priority: .userInitiated) {
+            try upscaler.upscale(image, doublings: plan.doublings)
+        }.value
+        if let fit = plan.fit {
+            out = try ImageResampling.lanczos(out, toWidth: fit.width, height: fit.height)
+        }
+        lastAppliedScale = Int((Double(out.width) / Double(image.width)).rounded())
+        let name = plan.modelName(Self.instantModelName)
+        log.notice("\(label, privacy: .public): instant upscale (\(name, privacy: .public)) \(image.width, privacy: .public)×\(image.height, privacy: .public) → \(out.width, privacy: .public)×\(out.height, privacy: .public) in \(Date().timeIntervalSince(start), format: .fixed(precision: 3), privacy: .public) s")
+        return EnhanceOutcome(image: out, upscaleTier: .instant, upscaleModel: name)
+    }
+
     /// A generative tier through `EngineTextGuardedUpscaler`, with the policy its pair EARNED (`measuredPolicy(for:)`:
     /// VOSR2 routes generative; Nacre protects legible words with the fast tier's pixels, AB-R-0400). Reports the tier,
     /// the model or models whose pixels shipped, and the guard's route — so a composite never ships under one name.
@@ -268,7 +315,16 @@ public final class EngineImageEnhancer: ImageEnhancer {
     /// no amount of evicting can fix. A run that the governor still declines at admission (another app tenant
     /// holding memory, a workload over its declared ceiling) fails with `EnhanceError.declined` and its reason.
     public func availability(of tier: UpscaleTier) async -> UpscaleTierAvailability {
-        let model = Self.model(for: tier)
+        if tier == .instant {
+            // No registration and no governor: the only requirement is a Metal GPU.
+            return Anime4KUpscaler.isAvailable
+                ? .available(.instant, model: Self.instantModelName)
+                : .unavailable(.instant, model: Self.instantModelName,
+                               reason: Anime4KUpscaler.unavailableReason ?? "no Metal device")
+        }
+        guard let model = Self.model(for: tier) else {
+            return .unavailable(tier, reason: EnhanceError.notAnEngineTier(tier).description)
+        }
         guard !tier.isVideoOnly else {
             return .unavailable(tier, model: model.modelName, reason: UpscaleTier.liveActionStillReason)
         }
@@ -308,6 +364,10 @@ public final class EngineImageEnhancer: ImageEnhancer {
         case unexpectedResponse(Capability)
         /// A whole-clip video tier (`UpscaleTier.isVideoOnly`) asked of the per-frame enhancer.
         case videoOnlyTier(UpscaleTier)
+        /// The Instant tier cannot run here (no Metal device); carries the reason.
+        case instantUnavailable(String)
+        /// A tier with no engine registration reached an engine-only path (a defect, never a user error).
+        case notAnEngineTier(UpscaleTier)
 
         public var description: String {
             switch self {
@@ -319,6 +379,10 @@ public final class EngineImageEnhancer: ImageEnhancer {
                 return "unexpected response from \(capability)"
             case .videoOnlyTier:
                 return UpscaleTier.liveActionStillReason
+            case .instantUnavailable(let why):
+                return "the Instant tier cannot run — \(why)"
+            case .notAnEngineTier(let tier):
+                return "the \(tier.rawValue) tier has no engine registration"
             }
         }
     }

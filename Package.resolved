@@ -1,6 +1,15 @@
 {
-  "originHash" : "2cdf5b6e516a06d2984f34a26f57f28bb72f299ee266ae0b69ee879c98d9cca6",
+  "originHash" : "ab64186dc2809d9cb0858b8a1718a2cad51902ba9024a85f30690bcab91861b0",
   "pins" : [
+    {
+      "identity" : "anime4k-metal",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/xocialize/anime4k-metal.git",
+      "state" : {
+        "revision" : "19b5e6f5a34673a8b1932eab230b529fdf562635",
+        "version" : "0.1.0"
+      }
+    },
     {
       "identity" : "colorizekit",
       "kind" : "remoteSourceControl",
@@ -69,8 +78,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/ForgeOptimizerKit.git",
       "state" : {
-        "revision" : "c9b5f5d193aad5ca5910014711d1e8c5577bdd80",
-        "version" : "0.24.0"
+        "revision" : "8af9958183b3eb7af5d4e82230bfa71031a5e354",
+        "version" : "0.25.0"
       }
     },
     {

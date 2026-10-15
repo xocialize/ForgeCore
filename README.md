@@ -70,6 +70,16 @@ per clip — not registered, not eligible, past the measured output ceiling (and
 Mac's budget, each with its numbers — and `upscale` reports the package's own frame count as progress (the engine's
 `RunProgress` `.upsample` reports). The per-frame `EngineImageEnhancer` refuses the tier on a still.
 
+## The Instant upscale tier runs outside the engine
+
+`UpscaleTier.instant` (ForgeOptimizerKit ≥ 0.25.0, AB-D-0146) is the efficiency tier: instant and model-free, for when
+speed is all a job needs. `EngineImageEnhancer` runs it as Anime4K's upscale-only VL network on Metal compute shaders
+(`anime4k-metal`, MIT), directly on the GPU. It needs no registration, no admission, no download and no memory tier,
+so it is available on any Mac with a Metal device, before `registerAll()` has run. ×2, ×4 and ×8 are one, two and three
+doublings; ×6 is ×8 fitted down with Lanczos (`InstantUpscalePlan`, AB-D-0119's rule). Depth and alpha are kept. The
+receipt names the model `Anime4K VL`. It is not a quality rival to Fast or Best, which score higher on every content
+class measured (AB-R-0559); `EngineImageEnhancer.model(for: .instant)` is nil because there is no registration.
+
 ## Generative Fill and Expand
 
 `ForgeCapabilities.generativeFill` (`EngineGenerativeFillProvider`, AB-A-0166) fills a selection from a prompt and

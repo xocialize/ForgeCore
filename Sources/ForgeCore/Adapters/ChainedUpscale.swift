@@ -94,6 +94,40 @@ public struct ChainedUpscalePlan: Equatable, Sendable {
     }
 }
 
+/// How the Instant tier (AB-D-0146) serves a factor: Anime4K VL doubles per pass and needs no model, so every pass is
+/// the same tier. ×2, ×4 and ×8 are one, two and three doublings. ×6 is ×8 fitted DOWN with Lanczos, for the reason the
+/// engine chain fits down; when the ×8 intermediate would pass `ChainedUpscalePlan.intermediatePixelCap` it is ×4
+/// fitted UP instead, and the name says "enlarged".
+public struct InstantUpscalePlan: Equatable, Sendable {
+    public let requested: Int
+    /// How many ×2 passes run.
+    public let doublings: Int
+    /// The exact size the doubled pixels are resampled to, or nil when the doublings land on it.
+    public let fit: ChainedUpscalePlan.Size?
+    /// True when the fit enlarges the doubled output.
+    public let fitsUp: Bool
+
+    public static func make(requested: Int, source: ChainedUpscalePlan.Size,
+                            intermediatePixelCap: Int = ChainedUpscalePlan.intermediatePixelCap) -> InstantUpscalePlan {
+        let asked = min(max(requested, 1), ChainedUpscalePlan.chainedMax)
+        let target = ChainedUpscalePlan.Size(width: source.width * asked, height: source.height * asked)
+        var doublings = 0
+        while (1 << doublings) < asked { doublings += 1 }
+        let reached = 1 << doublings
+        if reached == asked { return InstantUpscalePlan(requested: asked, doublings: doublings, fit: nil, fitsUp: false) }
+        if source.width * reached * source.height * reached <= intermediatePixelCap {
+            return InstantUpscalePlan(requested: asked, doublings: doublings, fit: target, fitsUp: false)
+        }
+        return InstantUpscalePlan(requested: asked, doublings: doublings - 1, fit: target, fitsUp: true)
+    }
+
+    /// The receipt's name: the model at the factor its passes reached, and the fit that finished it.
+    public func modelName(_ model: String) -> String {
+        guard let _ = fit else { return model }
+        return "\(model) ×\(1 << doublings) → ×\(requested) (Lanczos\(fitsUp ? ", enlarged" : ""))"
+    }
+}
+
 /// The one resampler the chain uses: CoreImage's Lanczos scale, sRGB in and out, cropped to the exact size. A deep
 /// (16-bit) image comes out 16-bit (AB-A-0158); an 8-bit one renders exactly as it always has.
 public enum ImageResampling {

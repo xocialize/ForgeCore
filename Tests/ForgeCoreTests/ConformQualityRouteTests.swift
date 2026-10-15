@@ -98,7 +98,8 @@ import MLXServeCore
             }
             let resident = await service.engine.residentPackages
             #expect(resident[restoreID] == nil, "a conform must never load the NAFNet restore")
-            #expect(resident[try #require(service.packageID(for: EngineImageEnhancer.model(for: tier)))] != nil)
+            let tierModel = try #require(EngineImageEnhancer.model(for: tier))
+            #expect(resident[try #require(service.packageID(for: tierModel))] != nil)
         }
     }
 

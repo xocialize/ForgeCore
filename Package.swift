@@ -41,7 +41,11 @@ let package = Package(
         // which `EngineImageEnhancer` maps to VOSR2 / Nacre behind the text guard (AB-T-0201, AB-D-0111).
         // 0.24.0 = conform keeps 16 bits for a deep image (G-6), so a 16-bit still reaches the 16-bit model boundary
         // (AB-A-0158) with its depth.
-        .package(url: "https://github.com/xocialize/ForgeOptimizerKit.git", from: "0.24.0"),
+        // 0.25.0 = `UpscaleTier.instant`, the efficiency tier (AB-D-0146), which `EngineImageEnhancer` runs on Anime4K.
+        .package(url: "https://github.com/xocialize/ForgeOptimizerKit.git", from: "0.25.0"),
+        // The Instant tier's backer: Anime4K's upscale-only VL network as Metal compute shaders (MIT, no MLX, no weights
+        // to download, no vendored binaries). 0.1.0 = `Anime4KUpscaler`, CGImage ×2 at 8/16 bits, alpha-aware, tiled.
+        .package(url: "https://github.com/xocialize/anime4k-metal.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/ExtractKit.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/ColorizeKit.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/EraseKit.git", from: "0.2.0"),
@@ -188,6 +192,7 @@ let package = Package(
             name: "ForgeCore",
             dependencies: [
                 .product(name: "ForgeOptimizerKit", package: "ForgeOptimizerKit"),
+                .product(name: "Anime4KMetal", package: "anime4k-metal"),
                 .product(name: "ExtractKit", package: "ExtractKit"),
                 .product(name: "ColorizeKit", package: "ColorizeKit"),
                 .product(name: "EraseKit", package: "EraseKit"),

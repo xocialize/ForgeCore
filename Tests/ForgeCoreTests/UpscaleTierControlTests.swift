@@ -22,7 +22,8 @@ import MLXToolKit
         #expect(ForgeModel.upscale.modelName == "NERVE")
         #expect(ForgeModel.upscaleFidelity.modelName == "RealPLKSR")
         for tier in UpscaleTier.allCases {
-            #expect(EngineImageEnhancer.tier(for: EngineImageEnhancer.model(for: tier)) == tier)
+            guard let model = EngineImageEnhancer.model(for: tier) else { continue }   // Instant has no registration
+            #expect(EngineImageEnhancer.tier(for: model) == tier)
         }
     }
 
@@ -49,7 +50,7 @@ import MLXToolKit
         for tier in [UpscaleTier.generative, .generativeClean] {
             let verdict = await enhancer.availability(of: tier)
             #expect(!verdict.isAvailable)
-            #expect(verdict.model == EngineImageEnhancer.model(for: tier).modelName)
+            #expect(verdict.model == EngineImageEnhancer.model(for: tier)?.modelName)
             #expect(verdict.unavailableReason?.contains("is not registered") == true, "\(verdict)")
         }
     }
@@ -64,10 +65,10 @@ import MLXToolKit
     /// Before registration nothing is available, and the reason says so — a tier is never "available" by default.
     @Test func unregisteredTiersAreUnavailableWithTheReason() async {
         let enhancer = EngineImageEnhancer(service: ForgeEngineService())
-        for tier in UpscaleTier.allCases where !tier.isVideoOnly {
+        for tier in UpscaleTier.allCases where !tier.isVideoOnly && tier != .instant {
             let verdict = await enhancer.availability(of: tier)
             #expect(!verdict.isAvailable)
-            #expect(verdict.model == EngineImageEnhancer.model(for: tier).modelName)
+            #expect(verdict.model == EngineImageEnhancer.model(for: tier)?.modelName)
             #expect(verdict.unavailableReason?.contains("is not registered") == true, "\(verdict)")
         }
         // The whole-clip tier is refused as a video tier, registered or not — never "not registered" on a still.
