@@ -199,10 +199,10 @@ public enum ForgeModel: String, CaseIterable, Sendable {
     // mask. WHICH model is configuration, not code — the service's `generativeFillTier` (`GenerativeFillTiers`, keyed by
     // unified memory) — so one registration id, `generative-fill`, serves every tier. The default is AB-D-0141 as amended:
     // SenseNova-U1.5-8B-MoT on the 8-step V2 adapter on every tier (16 GB 4-bit ≤ 768², 24 GB 4-bit ≤ 1024², 32 GB+ 8-bit
-    // ≤ 1024²), which beat FLUX.2-klein-4B through that route on fill, extend and remove (AB-R-0534); Klein-4B int4 with the
-    // encoder evicted is the documented 16 GB fallback (`GenerativeFillTiers.kleinAt16GB`). ⚠️ SenseNova declares
-    // `chipFloor: .max` (measured on M5 Max only), so the engine refuses it on base and Pro chips until sensenova-u1-swift
-    // relaxes that; and its int4 declaration (12.2 + 4.5 GB) is refused on a 16 GB budget until AB-T-0278's 16 GB
+    // ≤ 1024²), which beat FLUX.2-klein-4B through that route on fill, extend and remove (AB-R-0534); Klein-4B int8 with the
+    // encoder evicted is the documented 16 GB fallback (`GenerativeFillTiers.kleinAt16GB`; int4 failed the quality gate,
+    // AB-R-0544). ⚠️ SenseNova declares `chipFloor: .pro` from sensenova-u1-swift 0.5.3 (measured on an M5 Pro 24 GB,
+    // AB-R-0551), so the engine refuses it on base chips until a base-chip receipt; and its int4 declaration (12.2 + 4.5 GB) is refused on a 16 GB budget until AB-T-0278's 16 GB
     // footprint lands. Both refusals surface as this registration's outcome / admissibility, never as a silent swap.
     case generativeFill    // SenseNova-U1.5 8step-v2 (int4/int8) or FLUX.2-klein-4B — per GenerativeFillTier
 

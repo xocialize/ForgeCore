@@ -36,8 +36,8 @@ import MLXKlein
         #expect(GenerativeFillTier.senseNova24GB.maxWindowPixels == 1024 * 1024)
         #expect(GenerativeFillTier.senseNova32GB.model == .senseNova(variant: .fast8V2))
         #expect(GenerativeFillTier.senseNova32GB.maxWindowPixels == 1024 * 1024)
-        // The documented fallback: Klein-4B int4, encoder evicted, ≤ 768², at 16 GB only.
-        #expect(GenerativeFillTiers.kleinAt16GB.tier(forPhysicalMemory: 16 * Self.gib)?.model == .klein(quant: .int4, evictEncoder: true))
+        // The documented fallback: Klein-4B int8, encoder evicted, ≤ 768², at 16 GB only (int4 failed AB-R-0544's gate).
+        #expect(GenerativeFillTiers.kleinAt16GB.tier(forPhysicalMemory: 16 * Self.gib)?.model == .klein(quant: .int8, evictEncoder: true))
         #expect(GenerativeFillTiers.kleinAt16GB.tier(forPhysicalMemory: 24 * Self.gib) == .senseNova24GB)
     }
 
@@ -46,10 +46,11 @@ import MLXKlein
             let data = try JSONEncoder().encode(tiers)
             #expect(try JSONDecoder().decode(GenerativeFillTiers.self, from: data) == tiers)
         }
-        // A host can write a tier by hand: Klein int8 evicted at 768² for 16 GB, the AB-A-0178 alternative.
+        // A host can write a tier by hand. This one is the shipped 16 GB fallback since AB-A-0182: Klein int8 evicted at 768².
         let json = #"{"label":"16 GB","model":{"klein":{"quant":"int8","evictEncoder":true}},"maxWindowPixels":589824}"#
         let tier = try JSONDecoder().decode(GenerativeFillTier.self, from: Data(json.utf8))
         #expect(tier.model == .klein(quant: .int8, evictEncoder: true) && tier.model.displayName == "FLUX.2-klein-4B int8 (encoder evicted)")
+        #expect(tier == .klein16GB)
     }
 
     @Test func theSenseNovaFillTiersServeImageEdit() {
@@ -107,14 +108,14 @@ import MLXKlein
 
     /// 🪤 Tripwire for AB-T-0278. On a 16 GB budget (12.7 GB) the engine's admission refuses SenseNova int4 as declared
     /// (12.2 GB resident + 4.5 GB 2048²-envelope activation — AB-R-0537), so the 16 GB tier cannot run through the engine
-    /// until sensenova-u1-swift ships its 16 GB footprint declaration; Klein-4B int4 evicted (5.2 + 5.0 GB) is admitted.
+    /// until sensenova-u1-swift ships its 16 GB footprint declaration; Klein-4B evicted (declared 5.2 + 5.0 GB at either quant until AB-T-0290) is admitted.
     /// When this starts failing on SenseNova, AB-T-0278 has landed: update the tier notes and REQUIREMENTS.md.
     @Test func atASixteenGigabyteBudgetOnlyKleinIsAdmittedToday() async {
         let budget = MemoryGovernor(budgetBytes: UInt64(Double(16 * Self.gib) * 0.74))
         let klein = ForgeEngineService(governor: budget, generativeFillTier: .klein16GB)
         await klein.registerAll()
         if let verdict = await klein.admissibility(for: .generativeFill) {
-            #expect(verdict.fitsBudget, "Klein int4 evicted should fit a 16 GB budget (footprint \(verdict.footprint))")
+            #expect(verdict.fitsBudget, "Klein int8 evicted should fit a 16 GB budget (footprint \(verdict.footprint))")
         }
         let senseNova = ForgeEngineService(governor: budget, generativeFillTier: .senseNova16GB)
         await senseNova.registerAll()

@@ -109,8 +109,8 @@ let wider  = try await fill.expand(image, left: 0, top: 0, right: 256, bottom: 0
   | 24 GB | SenseNova-U1.5-8B-MoT 8step-v2-4bit | 1024² |
   | 32 GB+ | SenseNova-U1.5-8B-MoT 8step-v2-8bit | 1024² |
 
-  `GenerativeFillTiers.kleinAt16GB` swaps 16 GB to the documented fallback, FLUX.2-klein-4B int4 with the encoder
-  evicted at 768². The tables are `Codable`, so a host can store its own. `.generativeFill` registers the tier's model
+  `GenerativeFillTiers.kleinAt16GB` swaps 16 GB to the documented fallback, FLUX.2-klein-4B int8 with the encoder
+  evicted at 768² (int4 failed mlx-image's quality gate, AB-R-0544). The tables are `Codable`, so a host can store its own. `.generativeFill` registers the tier's model
   under one id, `generative-fill`; set `generativeFillTier` and call `registerAll()` again to switch.
 - **The window.** When the whole picture fits the tier's cap, the model sees the whole picture, exactly as in the
   bake-off. When it doesn't, the model sees a square around the selection. The square is 2.5× the selection's long side,

@@ -3,9 +3,9 @@
 //  ForgeCore
 //
 //  Which model fills on which Mac, as CONFIGURATION (AB-A-0166). The provider never names a model in code: a host
-//  hands `ForgeEngineService` a tier, and `.generativeFill` registers whatever that tier says. The int4 tiers are still
-//  waiting on mlx-image's quality gate against their int8/bf16 references (AB-A-0178); if one fails, the editor swaps
-//  the tier (e.g. to `klein16GB`) without a new provider or a new ForgeCore.
+//  hands `ForgeEngineService` a tier, and `.generativeFill` registers whatever that tier says. mlx-image's quality gate
+//  (AB-A-0178, AB-R-0544) passed both SenseNova int4 tiers and failed Klein int4, so the 16 GB fallback is Klein int8. A
+//  host still swaps a tier (e.g. to `klein16GB`) without a new provider or a new ForgeCore.
 //
 
 import Foundation
@@ -87,9 +87,11 @@ public struct GenerativeFillTier: Sendable, Hashable, Codable {
     /// 32 GB+: SenseNova 8step-v2-8bit at a ≤ 1024² window (19.9 GB MLX peak at 1024², AB-R-0536) — the bake-off's arm.
     public static let senseNova32GB = GenerativeFillTier(label: "32 GB+", model: .senseNova(variant: .fast8V2),
                                                          maxWindowPixels: 1024 * 1024)
-    /// AB-D-0141's documented 16 GB fallback: Klein-4B int4, encoder evicted, ≤ 768² (8.9 GB MLX peak, AB-R-0534). Its
-    /// fill quality is below SenseNova's (3/15 prompt failures, 6/12 hazy extends through the same route).
-    public static let klein16GB = GenerativeFillTier(label: "16 GB", model: .klein(quant: .int4, evictEncoder: true),
+    /// AB-D-0141's documented 16 GB fallback: Klein-4B int8, encoder evicted, ≤ 768² (10.7 GB MLX peak, AB-R-0534). Int4
+    /// failed mlx-image's quality gate against bf16 (8/15 prompt failures vs 6/15, blind 1:4); int8 reproduces bf16
+    /// (AB-R-0544, AB-A-0182). Its fill quality is still below SenseNova's (AB-R-0534). KleinConfiguration's evict hints
+    /// (5.2 + 5.0 GB) don't vary with the quant, so int8 is under-declared until flux2-klein-swift re-declares (AB-T-0290).
+    public static let klein16GB = GenerativeFillTier(label: "16 GB", model: .klein(quant: .int8, evictEncoder: true),
                                                      maxWindowPixels: 768 * 768)
 }
 
@@ -117,8 +119,8 @@ public struct GenerativeFillTiers: Sendable, Hashable, Codable {
         Entry(minimumMemoryGiB: 32, tier: .senseNova32GB),
     ])
 
-    /// `forgeDefault` with AB-D-0141's documented 16 GB fallback (Klein-4B int4, encoder evicted, ≤ 768²) — for when the
-    /// real-16-GB-Mac run or the int4 quality gate (AB-A-0178) refuses SenseNova there.
+    /// `forgeDefault` with AB-D-0141's documented 16 GB fallback (Klein-4B int8, encoder evicted, ≤ 768²) — for when the
+    /// real-16-GB-Mac run or AB-T-0278's 16 GB declaration refuses SenseNova there (its quality gate passed, AB-R-0544).
     public static let kleinAt16GB = GenerativeFillTiers(entries: [
         Entry(minimumMemoryGiB: 16, tier: .klein16GB),
         Entry(minimumMemoryGiB: 24, tier: .senseNova24GB),
