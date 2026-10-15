@@ -97,6 +97,11 @@ public final class EngineTextGuardedUpscaler {
     /// (VOSR-EVAL §11.3): no opt-in route is earned for the VOSR2 pair at ×2 or ×4. A new base tier means re-running
     /// `GuardedUpscaleLiveTests` before trusting any opt-in route with it.
     public var base: ForgeModel
+    /// An optional second reader for WORD CONFIRMATION (`policy.wordConfirmation`): the protected words become the
+    /// certain Vision words this reader also read (`TextLegibilityGuard.confirm`). `SenseNovaTextReader.resident(in:
+    /// packageID:)` backs it with the U1 package when that is loaded; nil, or a reader that fails, leaves Vision's
+    /// verdict as it was. It changes WHICH words `.protectWords` freezes, never the route itself.
+    public var secondReader: (any TextSecondReader)?
 
     /// The policy a tier pair has EARNED through this adapter (`GuardedUpscaleLiveTests` + the OCR check, NERVE as the
     /// base). Every pair gets MaskKit's all-opt-in `.default` except the measured exceptions:
@@ -119,20 +124,26 @@ public final class EngineTextGuardedUpscaler {
     public init(service: ForgeEngineService,
                 policy: TextLegibilityGuard.Policy? = nil,
                 generative: ForgeModel = .upscaleGenerative,
-                base: ForgeModel = .upscale) {
+                base: ForgeModel = .upscale,
+                secondReader: (any TextSecondReader)? = nil) {
         precondition(generative.capability == .imageUpscale && base.capability == .imageUpscale)
         self.service = service
         self.policy = policy ?? Self.measuredPolicy(for: generative)
         self.generative = generative
         self.base = base
+        self.secondReader = secondReader
     }
 
     /// Assess the input, then run the tier(s) the verdict calls for and composite.
     public func upscale(_ image: CGImage, scale: Int) async throws -> Output {
         let t0 = Date()
-        let verdict = try await Self.assess(image, policy: policy)
+        var verdict = try await Self.assess(image, policy: policy)
+        if policy.wordConfirmation, let reader = secondReader, !verdict.protected.isEmpty {
+            verdict = await TextLegibilityGuard.confirm(verdict, image: image, reader: reader, policy: policy)
+        }
         let assessSeconds = Date().timeIntervalSince(t0)
-        log.notice("text guard: \(verdict.regions.count) lines read, \(verdict.protected.count) certain words, route \(verdict.recommendation.rawValue, privacy: .public) (\(String(format: "%.2f", assessSeconds))s)")
+        let confirmed = verdict.confirmed.map { " (\($0.words) of \($0.ofCertain) confirmed by the second reader)" } ?? ""
+        log.notice("text guard: \(verdict.regions.count) lines read, \(verdict.protected.count) certain words\(confirmed, privacy: .public), route \(verdict.recommendation.rawValue, privacy: .public) (\(String(format: "%.2f", assessSeconds))s)")
 
         switch verdict.recommendation {
         case .generative:
