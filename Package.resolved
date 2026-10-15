@@ -1,5 +1,5 @@
 {
-  "originHash" : "ab64186dc2809d9cb0858b8a1718a2cad51902ba9024a85f30690bcab91861b0",
+  "originHash" : "0802e2ceb5f12ac8ab90b10d6e153c86b5f16276ebb6f0a34ebae72fc6c53059",
   "pins" : [
     {
       "identity" : "anime4k-metal",
@@ -114,8 +114,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/MaskKit.git",
       "state" : {
-        "revision" : "5447fa2ab17e2e2e2d1d8aa5048f684d53b072dd",
-        "version" : "0.4.1"
+        "revision" : "b4790dcced505ca133240869d59eb76ee42213a7",
+        "version" : "0.5.0"
       }
     },
     {
