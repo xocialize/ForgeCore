@@ -83,7 +83,8 @@ registration.
 
 Engine clients reach the same pixels by name (0.41.0, AB-A-0183): `.upscaleInstant` registers `Anime4KUpscalePackage`, a
 **weightless** `imageUpscale` ModelPackage (the AudioPolish precedent) under id `anime4k-upscale`. MIT on both licence
-layers, `.metalGPU` only, nothing to download; `load()` compiles the Metal pipelines. It takes `.rawBGRA8` and keeps 16
+layers, `.metalGPU` only, nothing to download; `load()` compiles the Metal pipelines, and since 0.41.1 its configuration declares the shaders as a
+bundled source (they are compiled into the binary), so `needsDownload` reads false. It takes `.rawBGRA8` and keeps 16
 bits for `.rawRGBA16`, serves ×2/×4/×8 by doubling and ×6 fitted from ×8 (`InstantUpscalePlan`), and declares one
 1024-px tile's textures plus a 4096² output's buffers (0.5 GB 8-bit, 1.0 GB 16-bit). This is how MES `image.upscale`
 with `model: "anime4k-upscale"` runs it on the Pixel Agency Image Engine (through mlx-image-runtime's catalog).

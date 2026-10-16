@@ -33,6 +33,8 @@ import MLXToolKit
         #expect(manifest.license.weightLicenses.allSatisfy(\.isPermissive) && manifest.license.portCodeLicense.isPermissive)
         #expect(manifest.requirements.requiredBackends == [.metalGPU])
         #expect(await service.keepsSixteenBits(.upscaleInstant))
+        // Nothing to download, as the engine reads it (BundledWeightSourcing: the shaders live in the binary).
+        #expect(await service.engine.needsDownload(.imageUpscale, package: id) == false)
         #expect(await service.engine.residentPackages.isEmpty)
     }
 

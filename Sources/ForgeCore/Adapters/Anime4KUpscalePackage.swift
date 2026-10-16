@@ -22,8 +22,18 @@ import MLXToolKit
 
 /// Init-time configuration for `Anime4KUpscalePackage` (C9). Nothing to choose: the mode is the upscaler's default
 /// (upscale-only VL, AB-D-0146), and its 1024-px tile is what `footprints` was measured for.
-public struct Anime4KUpscaleConfiguration: PackageConfiguration {
+///
+/// `BundledWeightSourcing` (0.41.1): Anime4K's network constants are compiled into the binary as shader source, so the
+/// one "weight source" is the binary that carries `anime4k-metal`. Declaring it is the engine's sanctioned way to read
+/// `needsDownload == false`; without it a package with no sources falls through to the store-marker check and reads
+/// as never downloaded, so a client would offer a download that fetches nothing.
+public struct Anime4KUpscaleConfiguration: PackageConfiguration, BundledWeightSourcing {
     public init() {}
+
+    public var bundledWeightSources: [BundledWeightSource] {
+        [BundledWeightSource(role: "shaders",
+                             url: Bundle(for: Anime4KUpscaler.self).executableURL ?? Bundle.main.executableURL)]
+    }
 }
 
 /// An MLXEngine `imageUpscale` package over **Anime4K VL** (bloc97/Anime4K, MIT; the Metal port is xocialize's, MIT): the
