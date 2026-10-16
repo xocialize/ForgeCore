@@ -60,11 +60,11 @@ import MLXNacre
         #expect(ForgeModel.allCases.contains(.upscaleFidelity))
     }
 
-    /// Exactly six stills backers behind `imageUpscale`, all reachable from the case list a host iterates.
-    @Test func imageUpscaleHasExactlySixBackers() {
+    /// Exactly seven stills backers behind `imageUpscale`, all reachable from the case list a host iterates.
+    @Test func imageUpscaleHasExactlySevenBackers() {
         let backers = ForgeModel.allCases.filter { $0.capability == .imageUpscale }
         #expect(Set(backers) == Set([.upscale, .upscaleFidelity, .upscaleQuality, .upscaleGenerative, .upscaleHEART,
-                                     .upscaleNacre]))
+                                     .upscaleNacre, .upscaleInstant]))
     }
 
     /// HEART is the opt-in fidelity VARIANT: its own case, name and id, behind `imageUpscale` — and on NO default route:

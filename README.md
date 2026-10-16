@@ -70,7 +70,7 @@ per clip — not registered, not eligible, past the measured output ceiling (and
 Mac's budget, each with its numbers — and `upscale` reports the package's own frame count as progress (the engine's
 `RunProgress` `.upsample` reports). The per-frame `EngineImageEnhancer` refuses the tier on a still.
 
-## The Instant upscale tier runs outside the engine
+## The Instant upscale tier: outside the engine for the Optimizer, a weightless registration for engine clients
 
 `UpscaleTier.instant` (ForgeOptimizerKit ≥ 0.25.0, AB-D-0146) is the efficiency tier: instant and model-free, for when
 speed is all a job needs. `EngineImageEnhancer` runs it as Anime4K's upscale-only VL network on Metal compute shaders
@@ -78,7 +78,15 @@ speed is all a job needs. `EngineImageEnhancer` runs it as Anime4K's upscale-onl
 so it is available on any Mac with a Metal device, before `registerAll()` has run. ×2, ×4 and ×8 are one, two and three
 doublings; ×6 is ×8 fitted down with Lanczos (`InstantUpscalePlan`, AB-D-0119's rule). Depth and alpha are kept. The
 receipt names the model `Anime4K VL`. It is not a quality rival to Fast or Best, which score higher on every content
-class measured (AB-R-0559); `EngineImageEnhancer.model(for: .instant)` is nil because there is no registration.
+class measured (AB-R-0559); `EngineImageEnhancer.model(for: .instant)` is nil because the enhancer runs it with no
+registration.
+
+Engine clients reach the same pixels by name (0.41.0, AB-A-0183): `.upscaleInstant` registers `Anime4KUpscalePackage`, a
+**weightless** `imageUpscale` ModelPackage (the AudioPolish precedent) under id `anime4k-upscale`. MIT on both licence
+layers, `.metalGPU` only, nothing to download; `load()` compiles the Metal pipelines. It takes `.rawBGRA8` and keeps 16
+bits for `.rawRGBA16`, serves ×2/×4/×8 by doubling and ×6 fitted from ×8 (`InstantUpscalePlan`), and declares one
+1024-px tile's textures plus a 4096² output's buffers (0.5 GB 8-bit, 1.0 GB 16-bit). This is how MES `image.upscale`
+with `model: "anime4k-upscale"` runs it on the Pixel Agency Image Engine (through mlx-image-runtime's catalog).
 
 ## Generative Fill and Expand
 

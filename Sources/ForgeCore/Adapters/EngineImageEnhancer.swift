@@ -55,9 +55,11 @@ public final class EngineImageEnhancer: ImageEnhancer {
     /// enhancer never runs it: it is a whole-clip video tier served by `EngineVideoUpscaler`, and a still asked for it
     /// is refused (by the Kit first, and by `availability(of:)` / `enhanceReporting` here too).
     ///
-    /// `.instant` has no registration, so it maps to nil (0.40.0). It is the efficiency tier (AB-D-0146): Anime4K's
-    /// upscale-only VL network as Metal compute shaders (`anime4k-metal`), run directly on the GPU with no engine, no
-    /// admission, no download and no memory tier. It reports the model `instantModelName`.
+    /// `.instant` maps to nil (0.40.0): this enhancer runs it with no registration. It is the efficiency tier (AB-D-0146):
+    /// Anime4K's upscale-only VL network as Metal compute shaders (`anime4k-metal`), run directly on the GPU with no
+    /// engine, no admission, no download and no memory tier. It reports the model `instantModelName`. Engine clients reach
+    /// the same pixels through the weightless registration `.upscaleInstant` (`Anime4KUpscalePackage`, 0.41.0,
+    /// AB-A-0183); this map leaves it out so the Optimizer's Instant keeps working with nothing registered.
     public static func model(for tier: UpscaleTier) -> ForgeModel? {
         switch tier {
         case .fast: return .upscale

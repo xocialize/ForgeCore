@@ -56,12 +56,12 @@ let log = Logger(subsystem: "com.xocialize.ForgeCore", category: "ForgeCore")
 /// Every model package Forge registers. One case per registration, *not* per capability —
 /// Optimize alone uses two (restore + upscale), and one flow registration feeds four consumers.
 ///
-/// 🔑 **`upscale`, `upscaleFidelity`, `upscaleQuality`, `upscaleGenerative`, `upscaleHEART` and `upscaleNacre` are six
-/// registrations behind ONE capability**, which is the engine's multi-package-per-`PackageID` pattern and the first place
+/// 🔑 **`upscale`, `upscaleFidelity`, `upscaleQuality`, `upscaleGenerative`, `upscaleHEART`, `upscaleNacre` and
+/// `upscaleInstant` are seven registrations behind ONE capability**, which is the engine's multi-package-per-`PackageID` pattern and the first place
 /// Forge uses it: NERVE is the fast tier (2026-09-28, replacing Real-ESRGAN), RealPLKSR the fidelity tier (2026-09-28),
 /// SeedVR2-3B the quality tier, VOSR2 the generative stills tier (2026-09-26), HEART the opt-in fidelity variant
-/// (2026-09-29) and Nacre the opt-in provenance-clean generative variant (2026-10-05) — the last two reachable but never
-/// a default route — and the planner picks. Adding SeedVR2 does **not**
+/// (2026-09-29), Nacre the opt-in provenance-clean generative variant (2026-10-05) and Anime4K VL the weightless efficiency
+/// tier (2026-10-16) — the last three reachable but never a default route — and the planner picks. Adding SeedVR2 does **not**
 /// displace the fast tier — `MODEL-CATALOG.md`'s standing rule is that when SeedVR2 isn't viable (memory, chip,
 /// file) `videoUpscale` routes to the per-frame fast tier: *same tool, lighter backer.*
 ///
@@ -137,6 +137,16 @@ public enum ForgeModel: String, CaseIterable, Sendable {
     // earned for this pair until `GuardedUpscaleLiveTests` measures it. Native ×4; a ×2 request is post-downsampled and
     // `appliedScale` says so. Seeded (fixed by default), so a given image + configuration is reproducible.
     case upscaleNacre      // Nacre v1 (fp16, xocialize/nacre-v1-mlx, tiled 128/32) — the opt-in provenance-clean GENERATIVE variant
+    // ── upscaleInstant (AB-A-0183) ──
+    // Registered 2026-10-16. Anime4K VL (bloc97/Anime4K, MIT; `anime4k-metal`, MIT): the Instant tier (AB-D-0146) as an engine
+    // registration — a WEIGHTLESS package (`Anime4KUpscalePackage`, the AudioPolish precedent): Metal compute shaders, no MLX,
+    // nothing to download, a declared working set of one 1024-px tile plus a 4096² output's buffers (0.5 GB 8-bit, 1.0 GB
+    // 16-bit). The SEVENTH `imageUpscale` backer and
+    // the efficiency one: instant, never a quality rival to NERVE or HEART (AB-R-0559). It exists so engine clients reach
+    // Instant by name — MES `image.upscale` with `model: "anime4k-upscale"` on the Pixel Agency Image Engine — with routing,
+    // admission, the licence stamp and the descriptor for free. ForgeOptimizer's `EngineImageEnhancer` still runs `.instant`
+    // directly (`model(for: .instant)` stays nil), so the Optimizer app's Instant needs no registration.
+    case upscaleInstant    // Anime4K VL (weightless, Metal shaders) — the efficiency tier; reachable by name, never a default
     // ── upscaleVideoLiveAction (2026-10-04) ──
     // FlashVSR v1.1 (OpenImagingLab, Apache-2.0 code AND weights; `mlx-flashvsr-swift`): one-step streaming diffusion
     // video super-resolution — a Wan2.1-1.3B-shaped DiT with locality-constrained block-sparse attention (a Metal kernel
@@ -215,6 +225,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .upscaleFidelity: return "RealPLKSR"
         case .upscaleHEART: return "HEART"
         case .upscaleNacre: return "Nacre"
+        case .upscaleInstant: return Anime4KUpscalePackage.modelName
         case .upscaleVideoLiveAction: return "FlashVSR"
         case .matte:      return "BiRefNet"
         case .colorize:   return "DDColor"
@@ -254,6 +265,7 @@ public enum ForgeModel: String, CaseIterable, Sendable {
         case .upscaleFidelity: return .imageUpscale
         case .upscaleHEART: return .imageUpscale
         case .upscaleNacre: return .imageUpscale
+        case .upscaleInstant: return .imageUpscale
         case .upscaleVideoLiveAction: return .videoUpscale
         case .matte:      return .matting
         case .colorize:   return .imageColorize
@@ -660,6 +672,13 @@ public final class ForgeEngineService {
                 id = try await registerRecording(model, NacreUpscalePackage.registration,
                                                         configuration: NacreConfiguration(),
                                                         id: "nacre-upscale")
+            case .upscaleInstant:
+                // Anime4K VL (AB-A-0183): weightless — registration runs the licence gate (MIT/MIT) and device eligibility
+                // (`.metalGPU`) only, and `load()` compiles the Metal pipelines. Explicit id, equal to the manifest's
+                // surface name (AB-L-0160).
+                id = try await registerRecording(model, Anime4KUpscalePackage.registration,
+                                                        configuration: Anime4KUpscaleConfiguration(),
+                                                        id: "anime4k-upscale")
             case .upscaleVideoLiveAction:
                 // FlashVSR (mlx-flashvsr-swift ≥ 0.1.0). Package defaults on purpose (the BRIDGE-067 discipline): the bf16
                 // lane (inside the fp32 seed spread on every full-reference metric, half the memory), seed 0, upstream's
