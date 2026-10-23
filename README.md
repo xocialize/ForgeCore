@@ -114,29 +114,34 @@ let wider  = try await fill.expand(image, left: 0, top: 0, right: 256, bottom: 0
 
   | Mac | model | window cap |
   |---|---|---|
-  | 16 GB | SenseNova-U1.5-8B-MoT 8step-v2-4bit | 768² |
+  | 16 GB | SenseNova-U1.5-8B-MoT 8step-v2-4bit, `.fill768` window | 768² |
   | 24 GB | SenseNova-U1.5-8B-MoT 8step-v2-4bit | 1024² |
   | 32 GB+ | SenseNova-U1.5-8B-MoT 8step-v2-8bit | 1024² |
 
-  `GenerativeFillTiers.kleinAt16GB` swaps 16 GB to the documented fallback, FLUX.2-klein-4B int8 with the encoder
-  evicted at 768² (int4 failed mlx-image's quality gate, AB-R-0544). The tables are `Codable`, so a host can store its own. `.generativeFill` registers the tier's model
-  under one id, `generative-fill`; set `generativeFillTier` and call `registerAll()` again to switch.
+  The 16 GB tier registers `SenseNovaU1Configuration(variant: .fast4V2, window: .fill768)` (sensenova-u1-swift 0.6.0):
+  11.8 GB resident + 0.75 GB activation = 12.55 GB, which the engine admits on a 16 GB Mac's 12.7 GB budget. The window
+  refuses an output over 768² by area, a second reference, or a guidance branch; the route renders inside it, with one
+  reference at the render size and the tier's defaults. Klein is **not** the 16 GB fallback: Klein stays off 16 GB
+  (AB-D-0141, amended 2026-10-22), and `GenerativeFillTiers.kleinAt16GB` is not a shipping configuration. The tables
+  are `Codable`, so a host can store its own. `.generativeFill` registers the tier's model under one id,
+  `generative-fill`; set `generativeFillTier` and call `registerAll()` again to switch.
 - **The window.** When the whole picture fits the tier's cap, the model sees the whole picture, exactly as in the
   bake-off. When it doesn't, the model sees a square around the selection. The square is 2.5× the selection's long side,
   at least the cap's side and at most the picture's short side, which is the Image Engine's own rule for a square
   around a region. A small selection on a big photo is therefore painted 1:1, not squeezed. A selection longer than
   the short side gets the whole picture, scaled into the cap. Expand always sends the whole new canvas, scaled into the
-  cap, as the route does.
+  cap, as the route does. A tier's cap is held inside its model's declared window, so a hand-written tier with a larger
+  cap still renders at the window's size.
 - **Report.** Every call reports the tier, model, quant, the weight and port licences (read from the registered
   manifest), the window, the seed that was used, retries, and whether LaMa ran. `fillReporting` returns the report, and
   `onReport:` delivers it to hosts that use the plain seam.
 - **Needs two models.** `requiredModels` is `[.generativeFill, .inpaint]`: LaMa is the guard's fallback and expand's
   seam bridge. Offer both downloads before the first fill.
-- ⚠️ **Not every Mac can run it yet.** SenseNova declares `chipFloor: .max` (measured on M5 Max only), so the engine
-  refuses it on base and Pro chips. Its int4 declaration (12.2 + 4.5 GB) is refused on a 16 GB budget until
-  sensenova-u1-swift ships a 16 GB footprint declaration (AB-T-0278). Both refusals show up as `.generativeFill`'s
-  outcome or admissibility, never as a silent swap. The 16 GB tier also needs every other MLX resident evicted first,
-  and a real-16-GB-Mac confirmation before it ships (AB-D-0141).
+- ⚠️ **Not every Mac can run it yet.** SenseNova declares `chipFloor: .pro` (measured on an M5 Pro 24 GB, AB-R-0551),
+  so the engine refuses it on base chips until a base-chip receipt. The refusal shows up as `.generativeFill`'s outcome,
+  never as a silent swap. The 16 GB tier was confirmed on a real 16 GB Mac (an M1 Pro, AB-R-0602): a 768² fill peaks at
+  11,930 MiB MLX and a 12.60 GB process footprint, with swap only on the first load, and takes about 41–43 s warm. It
+  needs every other MLX resident evicted first (AB-D-0141); that is the host's job.
 
 The route lives in `Sources/ForgeCore/GenerativeFill/` and is engine-free: CoreGraphics over 8-bit premultiplied RGBA,
 with the model and LaMa injected as closures. `FillRoute`'s functions are the Image Engine's, line for line after a

@@ -178,7 +178,7 @@ public final class EngineGenerativeFillProvider {
             return FillPixels(try EngineImageCoding.cgImage(from: output))
         }
         return RunContext(tier: tier, packageID: fillID, license: await engine.manifest(for: fillID)?.license,
-                          route: GenerativeFillRoute(maxWindowPixels: tier.maxWindowPixels, multipleOf: tier.model.multipleOf),
+                          route: tier.route,
                           paint: paint, inpaint: inpaint)
     }
 

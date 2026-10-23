@@ -209,11 +209,12 @@ public enum ForgeModel: String, CaseIterable, Sendable {
     // mask. WHICH model is configuration, not code — the service's `generativeFillTier` (`GenerativeFillTiers`, keyed by
     // unified memory) — so one registration id, `generative-fill`, serves every tier. The default is AB-D-0141 as amended:
     // SenseNova-U1.5-8B-MoT on the 8-step V2 adapter on every tier (16 GB 4-bit ≤ 768², 24 GB 4-bit ≤ 1024², 32 GB+ 8-bit
-    // ≤ 1024²), which beat FLUX.2-klein-4B through that route on fill, extend and remove (AB-R-0534); Klein-4B int8 with the
-    // encoder evicted is the documented 16 GB fallback (`GenerativeFillTiers.kleinAt16GB`; int4 failed the quality gate,
-    // AB-R-0544). ⚠️ SenseNova declares `chipFloor: .pro` from sensenova-u1-swift 0.5.3 (measured on an M5 Pro 24 GB,
-    // AB-R-0551), so the engine refuses it on base chips until a base-chip receipt; and its int4 declaration (12.2 + 4.5 GB) is refused on a 16 GB budget until AB-T-0278's 16 GB
-    // footprint lands. Both refusals surface as this registration's outcome / admissibility, never as a silent swap.
+    // ≤ 1024²), which beat FLUX.2-klein-4B through that route on fill, extend and remove (AB-R-0534). The 16 GB tier
+    // registers SenseNova's `.fill768` window (sensenova-u1-swift 0.6.0, AB-T-0278): 11.8 + 0.75 GB, admitted on a 16 GB
+    // budget where the native int4 declaration (12.2 + 4.5 GB) is refused; confirmed on a real 16 GB Mac (AB-R-0602).
+    // There is no Klein fallback at 16 GB (AB-D-0141, amended 2026-10-22). ⚠️ SenseNova declares `chipFloor: .pro` from
+    // sensenova-u1-swift 0.5.3 (measured on an M5 Pro 24 GB, AB-R-0551), so the engine refuses it on base chips until a
+    // base-chip receipt (AB-A-0181). That refusal surfaces as this registration's outcome, never as a silent swap.
     case generativeFill    // SenseNova-U1.5 8step-v2 (int4/int8) or FLUX.2-klein-4B — per GenerativeFillTier
 
     public var modelName: String {
@@ -452,8 +453,8 @@ public final class ForgeEngineService {
 
     /// The Generative Fill tier `.generativeFill` registers: which model, at which quant, with which window cap. nil = no
     /// tier for this Mac (below 16 GB), and `.generativeFill` reports that as its outcome. The default is
-    /// `GenerativeFillTiers.forgeDefault` for this Mac's unified memory; a host that emulates a smaller Mac, or switches a
-    /// tier after mlx-image's int4 gate (AB-A-0178), sets it from its own `GenerativeFillTiers`. A change takes effect at
+    /// `GenerativeFillTiers.forgeDefault` for this Mac's unified memory; a host that emulates a smaller Mac, or chooses
+    /// another tier, sets it from its own `GenerativeFillTiers`. A change takes effect at
     /// the next `registerAll()`, which re-registers the same id and evicts the old model.
     public var generativeFillTier: GenerativeFillTier?
 

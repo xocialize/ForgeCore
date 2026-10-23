@@ -1,5 +1,5 @@
 {
-  "originHash" : "934f5365d55083270bf005ea8bc2151a04de04a683a021e4b6348b8e69052b9a",
+  "originHash" : "d34ce04f0c35121451ef4b4cb5889e2dbe4f791a07b7e5d44134ea69064d5d3b",
   "pins" : [
     {
       "identity" : "anime4k-metal",
@@ -402,8 +402,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/sensenova-u1-swift.git",
       "state" : {
-        "revision" : "9bb73fb220a140be609a27c3861af4d21a450a8a",
-        "version" : "0.5.3"
+        "revision" : "48f7d575b908809050dd3441dc97845ad29742b1",
+        "version" : "0.6.0"
       }
     },
     {

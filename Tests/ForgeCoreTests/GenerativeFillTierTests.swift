@@ -30,13 +30,15 @@ import MLXKlein
         for gb: UInt64 in [32, 36, 48, 64, 128] {
             #expect(tiers.tier(forPhysicalMemory: gb * Self.gib) == .senseNova32GB)
         }
-        #expect(GenerativeFillTier.senseNova16GB.model == .senseNova(variant: .fast4V2))
+        #expect(GenerativeFillTier.senseNova16GB.model == .senseNova(variant: .fast4V2, window: .fill768))
         #expect(GenerativeFillTier.senseNova16GB.maxWindowPixels == 768 * 768)
         #expect(GenerativeFillTier.senseNova24GB.model == .senseNova(variant: .fast4V2))
         #expect(GenerativeFillTier.senseNova24GB.maxWindowPixels == 1024 * 1024)
         #expect(GenerativeFillTier.senseNova32GB.model == .senseNova(variant: .fast8V2))
         #expect(GenerativeFillTier.senseNova32GB.maxWindowPixels == 1024 * 1024)
-        // The documented fallback: Klein-4B int8, encoder evicted, ≤ 768², at 16 GB only (int4 failed AB-R-0544's gate).
+        // Klein is not the 16 GB fallback (AB-D-0141, amended 2026-10-22): no Klein tier in the default table.
+        #expect(!GenerativeFillTiers.forgeDefault.entries.contains { if case .klein = $0.tier.model { true } else { false } })
+        // `kleinAt16GB` stays a host-chosen table, not a shipping one: Klein-4B int8, encoder evicted, ≤ 768², at 16 GB only.
         #expect(GenerativeFillTiers.kleinAt16GB.tier(forPhysicalMemory: 16 * Self.gib)?.model == .klein(quant: .int8, evictEncoder: true))
         #expect(GenerativeFillTiers.kleinAt16GB.tier(forPhysicalMemory: 24 * Self.gib) == .senseNova24GB)
     }
@@ -46,11 +48,16 @@ import MLXKlein
             let data = try JSONEncoder().encode(tiers)
             #expect(try JSONDecoder().decode(GenerativeFillTiers.self, from: data) == tiers)
         }
-        // A host can write a tier by hand. This one is the shipped 16 GB fallback since AB-A-0182: Klein int8 evicted at 768².
+        // A host can write a tier by hand, e.g. Klein int8 evicted at 768² (a host's choice; not a 16 GB fallback).
         let json = #"{"label":"16 GB","model":{"klein":{"quant":"int8","evictEncoder":true}},"maxWindowPixels":589824}"#
         let tier = try JSONDecoder().decode(GenerativeFillTier.self, from: Data(json.utf8))
         #expect(tier.model == .klein(quant: .int8, evictEncoder: true) && tier.model.displayName == "FLUX.2-klein-4B int8 (encoder evicted)")
         #expect(tier == .klein16GB)
+        // The 16 GB tier stores its window; a SenseNova tier stored before the window existed decodes as native (nil).
+        let stored = String(decoding: try JSONEncoder().encode(GenerativeFillTier.senseNova16GB), as: UTF8.self)
+        #expect(stored.contains(#""window":"fill-768""#))
+        let legacy = #"{"label":"24 GB","model":{"senseNova":{"variant":"8step-v2-4bit"}},"maxWindowPixels":1048576}"#
+        #expect(try JSONDecoder().decode(GenerativeFillTier.self, from: Data(legacy.utf8)) == .senseNova24GB)
     }
 
     @Test func theSenseNovaFillTiersServeImageEdit() {
@@ -106,20 +113,67 @@ import MLXKlein
         }
     }
 
-    /// 🪤 Tripwire for AB-T-0278. On a 16 GB budget (12.7 GB) the engine's admission refuses SenseNova int4 as declared
-    /// (12.2 GB resident + 4.5 GB 2048²-envelope activation — AB-R-0537), so the 16 GB tier cannot run through the engine
-    /// until sensenova-u1-swift ships its 16 GB footprint declaration; Klein-4B evicted (declared 5.2 + 5.0 GB at either quant until AB-T-0290) is admitted.
-    /// When this starts failing on SenseNova, AB-T-0278 has landed: update the tier notes and REQUIREMENTS.md.
-    @Test func atASixteenGigabyteBudgetOnlyKleinIsAdmittedToday() async {
-        let budget = MemoryGovernor(budgetBytes: UInt64(Double(16 * Self.gib) * 0.74))
-        let klein = ForgeEngineService(governor: budget, generativeFillTier: .klein16GB)
-        await klein.registerAll()
-        if let verdict = await klein.admissibility(for: .generativeFill) {
-            #expect(verdict.fitsBudget, "Klein int8 evicted should fit a 16 GB budget (footprint \(verdict.footprint))")
+    /// The tier registers the declaration the engine charges: the 16 GB tier its `.fill768` window, the 24 GB and 32 GB+
+    /// tiers the native envelope (sensenova-u1-swift 0.6.0, AB-T-0278).
+    @Test func theSixteenGigabyteTierRegistersTheFill768Window() throws {
+        let config16 = try #require(GenerativeFillTier.senseNova16GB.model.registration.1 as? SenseNovaU1Configuration)
+        #expect(config16.variant == .fast4V2 && config16.window == .fill768)
+        #expect(config16.residentBytesHint == 11_800_000_000 && config16.peakActivationBytesHint == 750_000_000)
+        for tier in [GenerativeFillTier.senseNova24GB, .senseNova32GB] {
+            let config = try #require(tier.model.registration.1 as? SenseNovaU1Configuration)
+            #expect(config.window == .native && config.residentBytesHint == nil, "\(tier.label)")
         }
-        let senseNova = ForgeEngineService(governor: budget, generativeFillTier: .senseNova16GB)
-        await senseNova.registerAll()
-        guard let verdict = await senseNova.admissibility(for: .generativeFill) else { return }   // below the chip floor
-        #expect(!verdict.fitsBudget, "SenseNova int4 now fits a 16 GB budget — AB-T-0278 landed? footprint \(verdict.footprint)")
+        #expect(GenerativeFillTier.senseNova16GB.model.declaredMaxPixels == 768 * 768)
+        #expect(GenerativeFillTier.senseNova24GB.model.declaredMaxPixels == nil)
+    }
+
+    /// AB-T-0278 landed (sensenova-u1-swift 0.6.0): on a 16 GB budget (16 GiB × 0.74 ≈ 12.7 GB) the engine admits the
+    /// 16 GB tier's `.fill768` window (11.8 + 0.75 GB), and still refuses SenseNova int4's native declaration (12.2 GB
+    /// resident + 4.5 GB 2048²-envelope activation, AB-R-0537). Confirmed on a real 16 GB Mac, AB-R-0602.
+    @Test func atASixteenGigabyteBudgetSenseNovaFill768IsAdmitted() async {
+        let budget = MemoryGovernor(budgetBytes: UInt64(Double(16 * Self.gib) * 0.74))
+        let window = ForgeEngineService(governor: budget, generativeFillTier: .senseNova16GB)
+        await window.registerAll()
+        guard let verdict = await window.admissibility(for: .generativeFill) else { return }   // below the chip floor
+        #expect(verdict.fitsBudget, "SenseNova .fill768 should fit a 16 GB budget (footprint \(verdict.footprint))")
+        let native = GenerativeFillTier(label: "16 GB native", model: .senseNova(variant: .fast4V2), maxWindowPixels: 768 * 768)
+        let refused = ForgeEngineService(governor: budget, generativeFillTier: native)
+        await refused.registerAll()
+        guard let nativeVerdict = await refused.admissibility(for: .generativeFill) else { return }
+        #expect(!nativeVerdict.fitsBudget, "SenseNova int4 native now fits a 16 GB budget? footprint \(nativeVerdict.footprint)")
+    }
+
+    /// The window refuses an output over 768² by area, a second reference, or a guidance branch (`outsideWindow`), so the
+    /// 16 GB tier's route must never ask for one: a 1024² fill renders a 768² window with ONE reference at the render size,
+    /// a 1024² expand scales its canvas into 768², and a hand-written tier whose cap exceeds its declaration is held to it.
+    @Test func aTenTwentyFourRequestOnTheSixteenGigabyteTierIsScaledIntoTheWindow() async throws {
+        let maxPixels = try #require(SenseNovaWindow.fill768.maxPixels)
+        let route = GenerativeFillTier.senseNova16GB.route
+        #expect(route.maxWindowPixels == maxPixels && route.multipleOf == 32)
+
+        for box in [FillBox(x: 600, y: 380, width: 150, height: 110),        // small selection: a 1:1 768² square
+                    FillBox(x: 50, y: 300, width: 940, height: 200)] {       // context over the cap: 1024² square at 768²
+            let image = FillPixels(FillFixture.photo(width: 1024, height: 1024))
+            let mask = FillFixture.mask(width: 1024, height: 1024, box: box, feather: 4)
+            let calls = FillCalls()
+            _ = try await route.fill(image, mask: mask, prompt: "a fountain", seed: 9,
+                                     paint: FakeModel.painter(original: nil, content: (200, 40, 40), drift: 0, calls: calls),
+                                     inpaint: FakeModel.lama(calls: calls))
+            let paints = calls.paints.withLock { $0 }
+            #expect(!paints.isEmpty)
+            for call in paints {
+                #expect(call.width * call.height <= maxPixels, "\(call.width)×\(call.height) is over the window")
+                #expect(call.marked.width == call.width && call.marked.height == call.height)   // one reference, render size
+            }
+        }
+
+        let expand = route.modelSize(width: 1024 + 256, height: 1024)
+        #expect(expand.width * expand.height <= maxPixels)
+
+        let handWritten = GenerativeFillTier(label: "16 GB, too wide",
+                                             model: .senseNova(variant: .fast4V2, window: .fill768),
+                                             maxWindowPixels: 1024 * 1024)
+        #expect(handWritten.route.maxWindowPixels == maxPixels)
+        #expect(GenerativeFillTier.senseNova24GB.route.maxWindowPixels == 1024 * 1024)
     }
 }

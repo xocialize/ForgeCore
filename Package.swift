@@ -181,11 +181,14 @@ let package = Package(
         // SenseNova-U1.5-8B-MoT on the 8-step V2 adapter (Apache-2.0 weights, MIT port) is the model on every memory tier; the
         // bake-off measured it through the Image Engine's fill route (AB-R-0534). 0.5.1 made the distill tiers serve
         // imageEdit (AB-R-0490); 0.5.2 = the load fix (int4 edit peak 14.7 → 12.2 GB, AB-R-0536);
-        // 0.5.3 = chipFloor .pro, measured on an M5 Pro 24 GB (AB-R-0551), the floor this tier needs.
-        .package(url: "https://github.com/xocialize/sensenova-u1-swift.git", from: "0.5.3"),
-        // FLUX.2-klein-4B (Apache-2.0 weights, MIT port): the documented 16 GB fallback in AB-D-0141 — int4 with the text
-        // encoder evicted at a ≤ 768² window (8.9 GB MLX peak). Linked so a host switches to it by configuration
-        // (`GenerativeFillTiers`), never by code. 0.8.1 = the edit surface with `evictEncoder`'s declared light footprint.
+        // 0.5.3 = chipFloor .pro, measured on an M5 Pro 24 GB (AB-R-0551), the floor this tier needs;
+        // 0.6.0 = `SenseNovaWindow.fill768`, the 16 GB tier's own declaration (11.8 + 0.75 GB, admitted on a 12.7 GB
+        // budget; AB-T-0278, confirmed on a real 16 GB Mac, AB-R-0602).
+        .package(url: "https://github.com/xocialize/sensenova-u1-swift.git", from: "0.6.0"),
+        // FLUX.2-klein-4B (Apache-2.0 weights, MIT port): linked so a host can choose it by configuration
+        // (`GenerativeFillTier.klein16GB`), never by code. It is NOT the 16 GB fallback: Klein stays off 16 GB
+        // (AB-D-0141, amended 2026-10-22).
+        // 0.8.1 = the edit surface with `evictEncoder`'s declared light footprint.
         .package(url: "https://github.com/xocialize/flux2-klein-swift.git", from: "0.8.1"),
     ],
     targets: [
@@ -239,7 +242,7 @@ let package = Package(
             .product(name: "MLXNacre", package: "mlx-nacre-swift"),   // … and Nacre's (the opt-in generative variant)
             .product(name: "MLXFlashVSR", package: "mlx-flashvsr-swift"), // … and FlashVSR's (the live-action video tier)
             .product(name: "MLXSenseNovaU1", package: "sensenova-u1-swift"), // GenerativeFillTierTests: the fill tiers serve imageEdit
-            .product(name: "MLXKlein", package: "flux2-klein-swift"),           // … and the documented 16 GB fallback's manifest
+            .product(name: "MLXKlein", package: "flux2-klein-swift"),           // … and the configurable Klein tier's manifest
         ]),
     ]
 )
