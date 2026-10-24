@@ -132,6 +132,13 @@ let wider  = try await fill.expand(image, left: 0, top: 0, right: 256, bottom: 0
   the short side gets the whole picture, scaled into the cap. Expand always sends the whole new canvas, scaled into the
   cap, as the route does. A tier's cap is held inside its model's declared window, so a hand-written tier with a larger
   cap still renders at the window's size.
+- **The reference floor (0.43.0, AB-A-0199).** SenseNova sizes its edit reference to at least 512² but renders the size
+  it is asked for, so a smaller render came back zoomed by render/512 about its top-left corner (a 448² render: scale
+  0.875, shifted −28 px). Any selection under about 128 × 128 hit it on every tier. `GenerativeFillModel.minimumRenderPixels`
+  (512² for SenseNova, none for Klein) is carried into the route by `GenerativeFillTier.route`, which is public, so a
+  host or probe driving the route itself builds it the same way. A window, or an expand's canvas, whose render would
+  fall under the floor is resampled up until it doesn't (451² → 512², 300² → 512²), on the grid and inside the cap,
+  and the painting is resized back to the window. Renders at or above the floor are unchanged.
 - **Report.** Every call reports the tier, model, quant, the weight and port licences (read from the registered
   manifest), the window, the seed that was used, retries, and whether LaMa ran. `fillReporting` returns the report, and
   `onReport:` delivers it to hosts that use the plain seam.

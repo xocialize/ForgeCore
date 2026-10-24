@@ -24,6 +24,11 @@
 //  - **New**: the marked window is handed to the model at the size it renders at, so the model's vision tokens are
 //    bounded by the cap too. Every bake-off case already had input size = render size, so the measured regime is
 //    unchanged; only an over-cap input (which the bake-off never sent) is now resized before the call, not inside it.
+//  - **New**: the model's reference floor (AB-A-0199). SenseNova sizes its edit reference to at least 512² but renders
+//    the size it is asked for, so a smaller render comes back zoomed by render/512 about its top-left corner (448²:
+//    scale 0.875, −28 px). A window whose render would fall under `minimumRenderPixels` is resampled up until it doesn't,
+//    on the grid and inside the cap, and its painting is resized back to the window as any resampled one is. The
+//    bake-off's canvases were all above the floor, so its regime is unchanged.
 //  - **New**: LaMa (fallback and seam bridge) is bounded to `inpaintMaxPixels` (4 × the window cap by default). Every
 //    bake-off canvas was under it, so LaMa ran at its own size there and does here; a larger canvas is scaled into the
 //    bound for LaMa and back, and the composite takes only the hole / band from it.
@@ -95,11 +100,15 @@ public struct GenerativeFillRoute: Sendable {
     public var multipleOf: Int
     /// The largest canvas LaMa runs on at its own size.
     public var inpaintMaxPixels: Int
+    /// The smallest render, in pixels, the model paints in place (SenseNova's 512² reference floor, AB-A-0199); 0 = none.
+    /// A smaller window is resampled up to it. The cap wins if the two can't both hold.
+    public var minimumRenderPixels: Int
 
-    public init(maxWindowPixels: Int, multipleOf: Int, inpaintMaxPixels: Int? = nil) {
-        precondition(maxWindowPixels > 0 && multipleOf > 0)
+    public init(maxWindowPixels: Int, multipleOf: Int, minimumRenderPixels: Int = 0, inpaintMaxPixels: Int? = nil) {
+        precondition(maxWindowPixels > 0 && multipleOf > 0 && minimumRenderPixels >= 0)
         self.maxWindowPixels = maxWindowPixels
         self.multipleOf = multipleOf
+        self.minimumRenderPixels = minimumRenderPixels
         self.inpaintMaxPixels = inpaintMaxPixels ?? 4 * maxWindowPixels
     }
 
@@ -110,13 +119,14 @@ public struct GenerativeFillRoute: Sendable {
         let m = multipleOf
         let whole = FillBox(x: 0, y: 0, width: w, height: h)
         // The whole picture fits the cap: exactly the route's call.
-        if let size = FillRoute.fit(width: w, height: h, maxPixels: maxWindowPixels, multipleOf: m) {
+        if let fitted = FillRoute.fit(width: w, height: h, maxPixels: maxWindowPixels, multipleOf: m) {
+            let size = floored(fitted, width: w, height: h)
             return FillWindow(box: whole, modelWidth: size.width, modelHeight: size.height)
         }
         // No square holds the selection: the route's own answer for an over-envelope canvas — all of it, scaled down.
         let short = min(w, h), long = max(region.width, region.height)
         guard long <= short else {
-            let size = FillRoute.clamp(width: w, height: h, maxPixels: maxWindowPixels, multipleOf: m)
+            let size = floored(FillRoute.clamp(width: w, height: h, maxPixels: maxWindowPixels, multipleOf: m), width: w, height: h)
             return FillWindow(box: whole, modelWidth: size.width, modelHeight: size.height)
         }
         // A square around the selection: 2.5× its long side for context, at least the cap's side (or the short side),
@@ -129,14 +139,32 @@ public struct GenerativeFillRoute: Sendable {
         let (cx, cy) = (region.x + region.width / 2, region.y + region.height / 2)
         let box = FillBox(x: min(max(cx - side / 2, 0), w - side), y: min(max(cy - side / 2, 0), h - side),
                           width: side, height: side)
-        let size = FillRoute.clamp(width: side, height: side, maxPixels: maxWindowPixels, multipleOf: m)
+        let size = floored(FillRoute.clamp(width: side, height: side, maxPixels: maxWindowPixels, multipleOf: m),
+                           width: side, height: side)
         return FillWindow(box: box, modelWidth: size.width, modelHeight: size.height)
     }
 
-    /// The render size for a whole canvas (an expand): the route's `envelope.fit ?? envelope.clamp` at the cap.
+    /// The render size for a whole canvas (an expand): the route's `envelope.fit ?? envelope.clamp` at the cap, lifted to
+    /// the model's reference floor.
     public func modelSize(width w: Int, height h: Int) -> (width: Int, height: Int) {
-        FillRoute.fit(width: w, height: h, maxPixels: maxWindowPixels, multipleOf: multipleOf)
-            ?? FillRoute.clamp(width: w, height: h, maxPixels: maxWindowPixels, multipleOf: multipleOf)
+        floored(FillRoute.fit(width: w, height: h, maxPixels: maxWindowPixels, multipleOf: multipleOf)
+                    ?? FillRoute.clamp(width: w, height: h, maxPixels: maxWindowPixels, multipleOf: multipleOf),
+                width: w, height: h)
+    }
+
+    /// `size`, the render for a `w` × `h` window, unless it is under `minimumRenderPixels`: then the window scaled up by
+    /// √(floor / area), each side rounded to the grid, and the side furthest under that scale grown a step at a time until
+    /// the floor holds (AB-A-0199: 451² → 512², 300² → 512²). A lift that would pass the cap is not made.
+    func floored(_ size: (width: Int, height: Int), width w: Int, height h: Int) -> (width: Int, height: Int) {
+        guard size.width * size.height < minimumRenderPixels, w > 0, h > 0 else { return size }
+        let m = multipleOf
+        let scale = (Double(minimumRenderPixels) / Double(w * h)).squareRoot()
+        var (rw, rh) = (max(m, Int((Double(w) * scale / Double(m)).rounded()) * m),
+                        max(m, Int((Double(h) * scale / Double(m)).rounded()) * m))
+        while rw * rh < minimumRenderPixels {
+            if Double(rw) / Double(w) <= Double(rh) / Double(h) { rw += m } else { rh += m }
+        }
+        return rw * rh <= maxWindowPixels ? (rw, rh) : size
     }
 
     // MARK: - Fill (RunPlan.inpaint's image.fill branch)

@@ -176,4 +176,20 @@ import MLXKlein
         #expect(handWritten.route.maxWindowPixels == maxPixels)
         #expect(GenerativeFillTier.senseNova24GB.route.maxWindowPixels == 1024 * 1024)
     }
+
+    /// SenseNova never renders under its 512² reference floor on any tier (AB-A-0199); Klein has no floor.
+    @Test func everySenseNovaTierCarriesTheReferenceFloor() {
+        for tier in GenerativeFillTiers.forgeDefault.entries.map(\.tier) {
+            #expect(tier.model.minimumRenderPixels == 512 * 512)
+            #expect(tier.route.minimumRenderPixels == 512 * 512, "\(tier.label)")
+            // PCIntelligence's window for a 75 × 75 selection (300²) renders at 512², inside the tier's cap.
+            let w = tier.route.window(for: FillBox(x: 112, y: 112, width: 75, height: 75), width: 300, height: 300)
+            #expect(w.modelWidth == 512 && w.modelHeight == 512, "\(tier.label): \(w)")
+            #expect(w.modelWidth * w.modelHeight <= tier.route.maxWindowPixels)
+        }
+        #expect(GenerativeFillTier.klein16GB.model.minimumRenderPixels == nil)
+        #expect(GenerativeFillTier.klein16GB.route.minimumRenderPixels == 0)
+        let klein = GenerativeFillTier.klein16GB.route.window(for: FillBox(x: 112, y: 112, width: 75, height: 75), width: 300, height: 300)
+        #expect(klein.modelWidth == 288 && klein.modelHeight == 288)
+    }
 }

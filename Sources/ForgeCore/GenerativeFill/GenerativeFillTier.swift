@@ -50,6 +50,17 @@ public enum GenerativeFillModel: Sendable, Hashable, Codable {
         }
     }
 
+    /// The smallest render, in pixels, the model paints in place; nil = no floor. SenseNova sizes its edit reference to at
+    /// least 512² (`smartResize(minPixels: 512 * 512)`) but renders the size it is asked for, so a smaller render comes
+    /// back zoomed by render/512 about its top-left corner (448²: scale 0.875, −28 px — AB-A-0199, AB-R-0603). The route
+    /// resamples a smaller window up to it.
+    public var minimumRenderPixels: Int? {
+        switch self {
+        case .senseNova: 512 * 512
+        case .klein: nil
+        }
+    }
+
     /// The largest render, in pixels, the model's declaration covers; nil = no cap beyond the tier's own.
     public var declaredMaxPixels: Int? {
         switch self {
@@ -85,10 +96,12 @@ public struct GenerativeFillTier: Sendable, Hashable, Codable {
     }
 
     /// The route this tier fills through: its window cap, held inside the model's declared window, so a hand-written tier
-    /// whose cap is larger than its declaration renders at the declaration's size instead of being refused by it.
-    var route: GenerativeFillRoute {
+    /// whose cap is larger than its declaration renders at the declaration's size instead of being refused by it; the
+    /// model's grid; and its reference floor, so no render falls under it (AB-A-0199). Public so a host or probe that
+    /// drives the route itself gets all three from the tier instead of rebuilding them.
+    public var route: GenerativeFillRoute {
         GenerativeFillRoute(maxWindowPixels: min(maxWindowPixels, model.declaredMaxPixels ?? .max),
-                            multipleOf: model.multipleOf)
+                            multipleOf: model.multipleOf, minimumRenderPixels: model.minimumRenderPixels ?? 0)
     }
 
     // AB-D-0141 as amended 2026-10-14: SenseNova on every tier.

@@ -343,6 +343,122 @@ enum FakeModel {
         #expect(insidePainted > box.width * box.height * 9 / 10)
     }
 
+    // MARK: Reference floor (AB-A-0199)
+
+    /// SenseNova's 32 GB+ route: 1024² cap, 32 px grid, 512² reference floor.
+    static let floored = GenerativeFillRoute(maxWindowPixels: 1024 * 1024, multipleOf: 32, minimumRenderPixels: 512 * 512)
+
+    @Test func aWindowUnderTheFloorRendersAtItOnTheGrid() {
+        // AB-A-0199's windows: 451² (rendered 448²), 480², 300² (rendered 288²), and 448² / 288² requests themselves.
+        for side in [448, 451, 480, 288, 300] {
+            let w = Self.floored.window(for: FillBox(x: side / 3, y: side / 3, width: side / 4, height: side / 4), width: side, height: side)
+            #expect(w.box == FillBox(x: 0, y: 0, width: side, height: side), "\(side)²: the window is still the picture")
+            #expect(w.modelWidth == 512 && w.modelHeight == 512, "\(side)²: rendered \(w.modelWidth)×\(w.modelHeight)")
+        }
+        // A window off the square: the lift keeps its aspect within a grid step, on the grid, at or above the floor.
+        for (width, height) in [(600, 200), (451, 340), (200, 700), (832, 96)] {
+            let w = Self.floored.window(for: FillBox(x: 10, y: 10, width: 20, height: 20), width: width, height: height)
+            #expect(w.modelWidth % 32 == 0 && w.modelHeight % 32 == 0)
+            #expect(w.modelWidth * w.modelHeight >= 512 * 512 && w.modelWidth * w.modelHeight <= 1024 * 1024)
+            let aspect = Double(w.modelWidth) / Double(w.modelHeight), target = Double(width) / Double(height)
+            #expect(abs(aspect / target - 1) < 32.0 / Double(min(w.modelWidth, w.modelHeight)) + 0.01,
+                    "\(width)×\(height) → \(w.modelWidth)×\(w.modelHeight)")
+        }
+        // A square around a selection on a picture too short for the cap's side: the 384² square (the 400 px short side on
+        // the grid) renders at 512², not 1:1.
+        let square = Self.floored.window(for: FillBox(x: 1500, y: 150, width: 100, height: 100), width: 3000, height: 400)
+        #expect(square.box.width == 384 && square.box.height == 384)
+        #expect(square.modelWidth == 512 && square.modelHeight == 512)
+    }
+
+    @Test func aWindowAtOrAboveTheFloorIsUnchanged() {
+        let plain = GenerativeFillRoute(maxWindowPixels: 1024 * 1024, multipleOf: 32)
+        // AB-A-0199's unaffected cases (512², 554² → 544², 832 × 1154 → 832 × 1152, 832 × 1050 → 832 × 1024), a big photo's
+        // 1:1 square, and a selection longer than the short side.
+        let cases: [(FillBox, Int, Int)] = [
+            (FillBox(x: 100, y: 100, width: 128, height: 128), 512, 512),
+            (FillBox(x: 100, y: 100, width: 160, height: 120), 554, 554),
+            (FillBox(x: 300, y: 130, width: 260, height: 320), 832, 1154),
+            (FillBox(x: 300, y: 130, width: 237, height: 291), 832, 1050),
+            (FillBox(x: 1900, y: 1400, width: 200, height: 160), 4000, 3000),
+            (FillBox(x: 100, y: 500, width: 3500, height: 200), 4000, 3000),
+        ]
+        for (region, width, height) in cases {
+            let w = Self.floored.window(for: region, width: width, height: height)
+            #expect(w == plain.window(for: region, width: width, height: height), "\(width)×\(height): \(w)")
+            #expect(w.modelWidth * w.modelHeight >= 512 * 512)
+        }
+        #expect(Self.floored.window(for: FillBox(x: 0, y: 0, width: 10, height: 10), width: 512, height: 512).isOneToOne)
+        #expect(Self.floored.modelSize(width: 832, height: 640) == plain.modelSize(width: 832, height: 640))
+    }
+
+    @Test func theCapWinsOverTheFloor() {
+        // A cap under the floor can't hold both: the render stays inside the cap, as it did before the floor.
+        let tight = GenerativeFillRoute(maxWindowPixels: 448 * 448, multipleOf: 32, minimumRenderPixels: 512 * 512)
+        let w = tight.window(for: FillBox(x: 10, y: 10, width: 50, height: 50), width: 448, height: 448)
+        #expect(w.modelWidth == 448 && w.modelHeight == 448)
+    }
+
+    @Test func everyFlooredWindowHoldsTheFloorTheGridAndTheCap() {
+        var rng = SystemRandomNumberGenerator()
+        for cap in [768 * 768, 1024 * 1024] {
+            let route = GenerativeFillRoute(maxWindowPixels: cap, multipleOf: 32, minimumRenderPixels: 512 * 512)
+            for _ in 0..<400 {
+                let (w, h) = (Int.random(in: 64...3000, using: &rng), Int.random(in: 64...3000, using: &rng))
+                let rw = Int.random(in: 1...min(w, 300), using: &rng), rh = Int.random(in: 1...min(h, 300), using: &rng)
+                let region = FillBox(x: Int.random(in: 0...(w - rw), using: &rng), y: Int.random(in: 0...(h - rh), using: &rng),
+                                     width: rw, height: rh)
+                let win = route.window(for: region, width: w, height: h)
+                #expect(win.modelWidth % 32 == 0 && win.modelHeight % 32 == 0)
+                #expect(win.modelWidth * win.modelHeight >= 512 * 512, "\(region) on \(w)×\(h): \(win)")
+                #expect(win.modelWidth * win.modelHeight <= cap, "\(region) on \(w)×\(h): \(win)")
+            }
+        }
+    }
+
+    @Test func aFillUnderTheFloorPaintsAtItAndComesBackAtTheWindowsSize() async throws {
+        // A 448² picture, as PCIntelligence hands the provider for a 112² selection: the model is asked for 512² with a
+        // 512² reference, and the painting lands back on the 448² window with every unselected pixel exact.
+        let image = FillPixels(FillFixture.photo(width: 448, height: 448))
+        let box = FillBox(x: 168, y: 168, width: 112, height: 112)
+        let mask = FillFixture.mask(width: 448, height: 448, box: box, feather: 3)
+        let calls = FillCalls()
+        let (patch, trace) = try #require(try await Self.floored.fill(image, mask: mask, prompt: "glasses", seed: 3,
+                                                                      paint: FakeModel.painter(original: nil, content: (30, 30, 30), drift: 0, calls: calls),
+                                                                      inpaint: FakeModel.lama(calls: calls)))
+        #expect(trace.window == FillWindow(box: FillBox(x: 0, y: 0, width: 448, height: 448), modelWidth: 512, modelHeight: 512))
+        let call = try #require(calls.paints.withLock { $0.first })
+        #expect(call.width == 512 && call.height == 512 && call.marked.width == 512 && call.marked.height == 512)
+        #expect(patch.box == FillBox(x: 0, y: 0, width: 448, height: 448))
+        #expect(patch.pixels.width == 448 && patch.pixels.height == 448)
+        let out = patch.applied(to: image)
+        var outsideChanged = 0, insidePainted = 0
+        for i in 0..<(448 * 448) {
+            if mask.values[i] == 0, out.rgba[i * 4..<i * 4 + 4] != image.rgba[i * 4..<i * 4 + 4] { outsideChanged += 1 }
+            if mask.values[i] == 255, Int(out.rgba[i * 4]) < 70 { insidePainted += 1 }
+        }
+        #expect(outsideChanged == 0)
+        #expect(insidePainted > box.width * box.height * 9 / 10)
+    }
+
+    @Test func anExpandOfASmallCanvasRendersAtTheFloor() async throws {
+        let image = FillPixels(FillFixture.photo(width: 320, height: 256))
+        let calls = FillCalls()
+        let (canvas, patch, trace) = try await Self.floored.expand(image, left: 0, top: 0, right: 96, bottom: 0, prompt: "", seed: 2,
+                                                                   paint: FakeModel.painter(original: nil, content: (120, 140, 90), drift: 0, calls: calls),
+                                                                   inpaint: FakeModel.lama(calls: calls))
+        #expect(canvas.width == 416 && canvas.height == 256)
+        #expect(trace.window.modelWidth * trace.window.modelHeight >= 512 * 512)
+        #expect(trace.window.modelWidth % 32 == 0 && trace.window.modelHeight % 32 == 0)
+        let call = try #require(calls.paints.withLock { $0.first })
+        #expect(call.width == trace.window.modelWidth && call.height == trace.window.modelHeight)
+        #expect(patch.pixels.width == 416 && patch.pixels.height == 256)
+        // Without a floor, the same canvas renders at its own 416 × 256.
+        let plain = GenerativeFillRoute(maxWindowPixels: 1024 * 1024, multipleOf: 32)
+        let unfloored = plain.modelSize(width: 416, height: 256)
+        #expect(unfloored.width == 416 && unfloored.height == 256)
+    }
+
     // MARK: Expand
 
     @Test func expandKeepsTheOriginalExactAndBridgesTheSeam() async throws {
