@@ -128,7 +128,8 @@ import UniformTypeIdentifiers
         // The bake-off's arm, at the Image Engine's SenseNova envelope (mlx-image-runtime: maxPixels 2048², multipleOf 32).
         let arm = GenerativeFillTier(label: "bake-off arm", model: .senseNova(variant: .fast8V2), maxWindowPixels: 2048 * 2048)
         let service = try await Self.service(tier: arm)
-        let provider = EngineGenerativeFillProvider(service: service)
+        // The bake-off's route exactly: no level and grain match (AB-T-0425), which came after it.
+        let provider = EngineGenerativeFillProvider(service: service, matchesSurroundings: false)
         let cases = try JSONSerialization.jsonObject(with: Data(contentsOf: bench.appendingPathComponent("cases.json"))) as! [String: Any]
         var outputs: [String: String] = [:]                              // "suite:item" → the Image Engine's output
         for file in ["run-fill", "run-rest"] {

@@ -71,12 +71,18 @@ public final class EngineGenerativeFillProvider {
 
     private let service: ForgeEngineService
     private let onReport: (@Sendable (GenerativeFillReport) -> Void)?
+    /// Whether the route matches each painting to the photo around it in level and grain (`FillMatch`, AB-T-0425). false
+    /// gives the bake-off's route exactly (its parity test).
+    public nonisolated let matchesSurroundings: Bool
 
     /// - Parameter onReport: called with every call's report — how a host reached through the plain seam (which returns
     ///   only an image) still records model, quant and licence per generated layer.
-    public init(service: ForgeEngineService, onReport: (@Sendable (GenerativeFillReport) -> Void)? = nil) {
+    /// - Parameter matchesSurroundings: see `matchesSurroundings`; on by default.
+    public init(service: ForgeEngineService, onReport: (@Sendable (GenerativeFillReport) -> Void)? = nil,
+                matchesSurroundings: Bool = true) {
         self.service = service
         self.onReport = onReport
+        self.matchesSurroundings = matchesSurroundings
         let tier = service.registeredGenerativeFillTier ?? service.generativeFillTier
         self.name = tier.map { "Generative Fill — \($0.model.displayName)" } ?? "Generative Fill (no tier on this Mac)"
     }
@@ -177,8 +183,10 @@ public final class EngineGenerativeFillProvider {
             guard let output = (response as? InpaintResponse)?.image else { throw GenerativeFillError.unexpectedResponse }
             return FillPixels(try EngineImageCoding.cgImage(from: output))
         }
+        var route = tier.route
+        route.matchesSurroundings = matchesSurroundings
         return RunContext(tier: tier, packageID: fillID, license: await engine.manifest(for: fillID)?.license,
-                          route: tier.route,
+                          route: route,
                           paint: paint, inpaint: inpaint)
     }
 

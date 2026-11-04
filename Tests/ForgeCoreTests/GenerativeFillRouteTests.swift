@@ -163,8 +163,9 @@ enum FakeModel {
         let mask = FillFixture.mask(width: image.width, height: image.height, box: box)
         let calls = FillCalls()
         // The fake re-renders the whole picture 10 levels brighter, the area included (the original under the marker):
-        // the harmonize must take that step back out where the painting meets the picture.
-        let route = GenerativeFillRoute(maxWindowPixels: 768 * 768, multipleOf: 32)
+        // the harmonize must take that step back out where the painting meets the picture. This is the bake-off's route,
+        // without the level and grain match that came after it (`FillMatchTests` has the route with it).
+        let route = GenerativeFillRoute(maxWindowPixels: 768 * 768, multipleOf: 32, matchesSurroundings: false)
         let (patch, trace) = try #require(try await route.fill(image, mask: mask, prompt: "  a red bicycle \n", seed: 7,
                                                               paint: FakeModel.painter(original: image, content: nil, drift: 10, calls: calls),
                                                               inpaint: FakeModel.lama(calls: calls)))
@@ -176,7 +177,7 @@ enum FakeModel {
         #expect(call.instruction == FillRoute.fillInstruction(prompt: "a red bicycle"))
         #expect(call.seed == 7 && call.width == 640 && call.height == 480)
         #expect(trace.window == FillWindow(box: FillBox(x: 0, y: 0, width: 640, height: 480), modelWidth: 640, modelHeight: 480))
-        #expect(trace.seed == 7 && trace.retries == 0 && !trace.fellBackToInpaint)
+        #expect(trace.seed == 7 && trace.retries == 0 && !trace.fellBackToInpaint && trace.matched == nil)
         // The model saw magenta exactly where the selection is non-black, and the picture elsewhere.
         for i in 0..<(image.width * image.height) {
             let marked = Array(call.marked.rgba[i * 4..<i * 4 + 4])

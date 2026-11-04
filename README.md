@@ -139,6 +139,20 @@ let wider  = try await fill.expand(image, left: 0, top: 0, right: 256, bottom: 0
   host or probe driving the route itself builds it the same way. A window, or an expand's canvas, whose render would
   fall under the floor is resampled up until it doesn't (451² → 512², 300² → 512²), on the grid and inside the cap,
   and the painting is resized back to the window. Renders at or above the floor are unchanged.
+- **Grain and level (0.44.0, AB-T-0425).** On a grainy photo every generated area came back smooth and a little off in
+  tone, so its edges showed. Measured on the real SenseNova (8step-v2-8bit, a photo with grain σ 9.3 by luma's 5 × 5
+  high-pass): the route's resample to the render size and back alone keeps 6.0; the model repaints at about 3–4 at its
+  render size, 2.5–3.5 back at the window; and its re-render drifts −9 to +18 luma, which the harmonize corrects only near
+  the seam. `FillMatch` now takes a fill's drift out of the whole painting at the area's own scale before the harmonize (a
+  second pass ignores what the model changed outside the area, such as clouds it added, and hands the harmonize the
+  original there, so it no longer smudges such a seam), and copies the photo's own grain back into the area from flat
+  tiles around it, scaled to what the painting lacks. An expand gets the grain and the cleaned harmonize, not the
+  shift: its new area has no photo around it to match, and the harmonize's seam-local correction is the right one. Measured after: grain 9.2–9.5
+  inside against 9.2–9.3 around a removal, 9.3–10.6 against 9.3–9.6 along an expand. Every unselected pixel stays
+  exact; a photo with no grain gets none; the grain is reproducible from the seed. The report's trace carries it
+  (`matched`: level shift per channel, the photo's grain, the painting's before and after).
+  `EngineGenerativeFillProvider(matchesSurroundings: false)` (or the route's own flag) gives the bake-off's output
+  exactly, which its parity test uses.
 - **Report.** Every call reports the tier, model, quant, the weight and port licences (read from the registered
   manifest), the window, the seed that was used, retries, and whether LaMa ran. `fillReporting` returns the report, and
   `onReport:` delivers it to hosts that use the plain seam.

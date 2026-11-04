@@ -29,6 +29,12 @@
 //    scale 0.875, −28 px). A window whose render would fall under `minimumRenderPixels` is resampled up until it doesn't,
 //    on the grid and inside the cap, and its painting is resized back to the window as any resampled one is. The
 //    bake-off's canvases were all above the floor, so its regime is unchanged.
+//  - **New**: the painting is matched to the photo around it in level and grain (AB-T-0425, `FillMatch`). The model's
+//    drift in tone, measured outside the area, is taken out of the whole painting at the area's scale before the
+//    harmonize (which then corrects only what's left at the seam, as before) — a fill's, not an expand's, whose new area
+//    has no photo around it to match; and the photo's own grain, which the model
+//    and the resample both smooth away, is copied back into the area from flat tiles around it. `matchesSurroundings`
+//    false gives the bake-off's output exactly.
 //  - **New**: LaMa (fallback and seam bridge) is bounded to `inpaintMaxPixels` (4 × the window cap by default). Every
 //    bake-off canvas was under it, so LaMa ran at its own size there and does here; a larger canvas is scaled into the
 //    bound for LaMa and back, and the composite takes only the hole / band from it.
@@ -83,6 +89,8 @@ public struct GenerativeFillTrace: Sendable, Equatable, Codable {
     public var fellBackToInpaint: Bool
     /// Expand only: LaMa bridged a band on the new side of the seam.
     public var seamBridged: Bool
+    /// The level and grain matched to the photo around the area (AB-T-0425); nil when the route doesn't match them.
+    public var matched: FillMatchReport? = nil
 }
 
 /// The fill / expand route over injected model calls. See the file header for what is the bake-off's and what is new.
@@ -103,13 +111,18 @@ public struct GenerativeFillRoute: Sendable {
     /// The smallest render, in pixels, the model paints in place (SenseNova's 512² reference floor, AB-A-0199); 0 = none.
     /// A smaller window is resampled up to it. The cap wins if the two can't both hold.
     public var minimumRenderPixels: Int
+    /// Whether the painting is matched to the photo around it in level and grain (`FillMatch`, AB-T-0425). false gives the
+    /// bake-off's route exactly.
+    public var matchesSurroundings: Bool
 
-    public init(maxWindowPixels: Int, multipleOf: Int, minimumRenderPixels: Int = 0, inpaintMaxPixels: Int? = nil) {
+    public init(maxWindowPixels: Int, multipleOf: Int, minimumRenderPixels: Int = 0, inpaintMaxPixels: Int? = nil,
+                matchesSurroundings: Bool = true) {
         precondition(maxWindowPixels > 0 && multipleOf > 0 && minimumRenderPixels >= 0)
         self.maxWindowPixels = maxWindowPixels
         self.multipleOf = multipleOf
         self.minimumRenderPixels = minimumRenderPixels
         self.inpaintMaxPixels = inpaintMaxPixels ?? 4 * maxWindowPixels
+        self.matchesSurroundings = matchesSurroundings
     }
 
     // MARK: - Window
@@ -183,13 +196,15 @@ public struct GenerativeFillRoute: Sendable {
                                         retries: 0, rejected: nil, fellBackToInpaint: false, seamBridged: false)
         if let painted = try await paintRegion(canvas, region: local, prompt: prompt, parts: nil, checkDark: false,
                                                seed: seed, paint: paint, trace: &trace) {
-            return (FillPatch(box: window.box, pixels: painted, mask: local), trace)
+            return (FillPatch(box: window.box, pixels: grained(painted, canvas: canvas, region: local, seed: seed, trace: &trace),
+                              mask: local), trace)
         }
         // The model left its region unpainted twice: LaMa fills it, so the marker never reaches an output.
         try Task.checkCancellation()
         trace.fellBackToInpaint = true
         let filled = try await inpaintBounded(canvas, hole: local.hole, inpaint: inpaint)
-        return (FillPatch(box: window.box, pixels: filled, mask: local), trace)
+        return (FillPatch(box: window.box, pixels: grained(filled, canvas: canvas, region: local, seed: seed, trace: &trace),
+                          mask: local), trace)
     }
 
     // MARK: - Expand (RunPlan.extend's generative branch)
@@ -214,7 +229,8 @@ public struct GenerativeFillRoute: Sendable {
             try Task.checkCancellation()
             trace.fellBackToInpaint = true
             let filled = try await inpaintBounded(canvas, hole: mask, inpaint: inpaint)
-            return (canvas, FillPatch(box: window.box, pixels: filled, mask: mask), trace)
+            return (canvas, FillPatch(box: window.box, pixels: grained(filled, canvas: canvas, region: mask, seed: seed, trace: &trace),
+                                      mask: mask), trace)
         }
         let painted = FillRoute.composite(result: paintedRegion, over: canvas, mask: mask)
         // The edit model continued its own re-rendering of the picture, so its border can meet the original out of step
@@ -225,7 +241,8 @@ public struct GenerativeFillRoute: Sendable {
         let bridged = try await inpaintBounded(painted, hole: band, inpaint: inpaint)
         trace.seamBridged = true
         let result = FillRoute.composite(result: bridged, over: painted, mask: band)
-        return (canvas, FillPatch(box: window.box, pixels: result, mask: mask), trace)
+        return (canvas, FillPatch(box: window.box, pixels: grained(result, canvas: canvas, region: mask, seed: seed, trace: &trace),
+                                  mask: mask), trace)
     }
 
     // MARK: - Steps
@@ -247,11 +264,26 @@ public struct GenerativeFillRoute: Sendable {
             guard let problem else {
                 trace.seed = attemptSeed
                 trace.retries = attempt
-                return FillRoute.harmonize(result, toward: canvas, region: region)
+                guard matchesSurroundings else { return FillRoute.harmonize(result, toward: canvas, region: region) }
+                // The model's drift out of the whole painting first, so the harmonize corrects only what's left at the seam.
+                // An expand (`parts`, its new sides) gets no shift: only the harmonize's local one (see `levelled`).
+                let (levelled, shift) = FillMatch.levelled(result, toward: canvas, region: region, shift: parts == nil)
+                trace.matched = FillMatchReport(level: shift, grain: 0, paintingGrain: 0, resultGrain: 0)
+                return FillRoute.harmonize(levelled, toward: canvas, region: region)
             }
             trace.rejected = problem
         }
         return nil
+    }
+
+    /// `painting` with the photo's grain in `region` (`FillMatch.grained`), recorded in the trace; as it is when the route
+    /// doesn't match its surroundings.
+    private func grained(_ painting: FillPixels, canvas: FillPixels, region: FillMask, seed: UInt64,
+                         trace: inout GenerativeFillTrace) -> FillPixels {
+        guard matchesSurroundings else { return painting }
+        let (out, grain, before, after) = FillMatch.grained(painting, original: canvas, region: region, seed: seed)
+        trace.matched = FillMatchReport(level: trace.matched?.level ?? [0, 0, 0], grain: grain, paintingGrain: before, resultGrain: after)
+        return out
     }
 
     /// LaMa at the canvas's own size up to `inpaintMaxPixels`; a larger canvas is scaled into that bound and back.
