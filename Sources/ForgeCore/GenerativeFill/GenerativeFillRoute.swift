@@ -35,6 +35,9 @@
 //    has no photo around it to match; and the photo's own grain, which the model
 //    and the resample both smooth away, is copied back into the area from flat tiles around it. `matchesSurroundings`
 //    false gives the bake-off's output exactly.
+//  - **New**: an expand's LaMa seam band is levelled to the photo's continued edge (AB-T-0450, `FillSeamLevel`), when
+//    `seamLevel` is set: the band came back with a ~5-luma line in its middle and the strip off the photo's level, so the
+//    photo's rectangle read on a clear sky. nil (the default) gives the route before it exactly.
 //  - **New**: LaMa (fallback and seam bridge) is bounded to `inpaintMaxPixels` (4 × the window cap by default). Every
 //    bake-off canvas was under it, so LaMa ran at its own size there and does here; a larger canvas is scaled into the
 //    bound for LaMa and back, and the composite takes only the hole / band from it.
@@ -91,6 +94,8 @@ public struct GenerativeFillTrace: Sendable, Equatable, Codable {
     public var seamBridged: Bool
     /// The level and grain matched to the photo around the area (AB-T-0425); nil when the route doesn't match them.
     public var matched: FillMatchReport? = nil
+    /// Expand only: the seam band levelled to the photo's edge (AB-T-0450); nil when the route doesn't level it.
+    public var seamLevel: FillSeamLevelReport? = nil
 }
 
 /// The fill / expand route over injected model calls. See the file header for what is the bake-off's and what is new.
@@ -114,15 +119,19 @@ public struct GenerativeFillRoute: Sendable {
     /// Whether the painting is matched to the photo around it in level and grain (`FillMatch`, AB-T-0425). false gives the
     /// bake-off's route exactly.
     public var matchesSurroundings: Bool
+    /// Expand only: how the LaMa seam band is levelled to the photo's edge (`FillSeamLevel`, AB-T-0450); nil leaves the band
+    /// as LaMa bridged it, the route before 0.45.0 exactly.
+    public var seamLevel: FillSeamLevel.Settings?
 
     public init(maxWindowPixels: Int, multipleOf: Int, minimumRenderPixels: Int = 0, inpaintMaxPixels: Int? = nil,
-                matchesSurroundings: Bool = true) {
+                matchesSurroundings: Bool = true, seamLevel: FillSeamLevel.Settings? = nil) {
         precondition(maxWindowPixels > 0 && multipleOf > 0 && minimumRenderPixels >= 0)
         self.maxWindowPixels = maxWindowPixels
         self.multipleOf = multipleOf
         self.minimumRenderPixels = minimumRenderPixels
         self.inpaintMaxPixels = inpaintMaxPixels ?? 4 * maxWindowPixels
         self.matchesSurroundings = matchesSurroundings
+        self.seamLevel = seamLevel
     }
 
     // MARK: - Window
@@ -237,10 +246,18 @@ public struct GenerativeFillRoute: Sendable {
         // (a trunk a little to one side). LaMa bridges a thin band on the new side of the seam from both sides' context;
         // the original's pixels stay as they are.
         try Task.checkCancellation()
-        let band = FillRoute.seamBand(of: mask, width: FillRoute.seamBandWidth(width: canvas.width, height: canvas.height))
+        let bandWidth = FillRoute.seamBandWidth(width: canvas.width, height: canvas.height)
+        let band = FillRoute.seamBand(of: mask, width: bandWidth)
         let bridged = try await inpaintBounded(painted, hole: band, inpaint: inpaint)
         trace.seamBridged = true
-        let result = FillRoute.composite(result: bridged, over: painted, mask: band)
+        var result = FillRoute.composite(result: bridged, over: painted, mask: band)
+        if let seamLevel {
+            // LaMa's band comes back with a line and the strip off the photo's level (AB-T-0450): level both to the edge.
+            let photo = FillBox(x: left, y: top, width: image.width, height: image.height)
+            let (levelled, report) = FillSeamLevel.levelled(result, photo: photo, band: bandWidth, settings: seamLevel)
+            result = levelled
+            trace.seamLevel = report
+        }
         return (canvas, FillPatch(box: window.box, pixels: grained(result, canvas: canvas, region: mask, seed: seed, trace: &trace),
                                   mask: mask), trace)
     }

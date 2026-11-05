@@ -153,6 +153,20 @@ let wider  = try await fill.expand(image, left: 0, top: 0, right: 256, bottom: 0
   (`matched`: level shift per channel, the photo's grain, the painting's before and after).
   `EngineGenerativeFillProvider(matchesSurroundings: false)` (or the route's own flag) gives the bake-off's output
   exactly, which its parity test uses.
+- **An expand's seam, levelled (0.45.0, AB-T-0450).** LaMa's seam band (18 px on a 900 × 760 canvas) came back with a
+  line about 5 luma dark in its middle, and the strip beside it a few levels off the photo's edge, so the photo's
+  rectangle read even on a clear sky. `FillSeamLevel` now runs after the bridge, on low frequencies only: it fits the
+  photo's first 16 rows per position along the seam with a level and a gradient, replaces the band's level with a
+  straight run from that continued edge to the strip beyond the band, and fades the strip's remaining offset out over four
+  more band widths (an offset only, σ 24 px along the seam, rounded with a fixed dither). Where the step, the band's
+  departure from a straight run, or the photo's or strip's level along the seam changes by more than 12 luma (a cloud cut
+  at the seam, a horizon crossing it), the correction fades out, so content is never smeared toward the photo. Measured on
+  the real SenseNova, both 1024² tiers, 3 seeds × a clouds prompt and an empty one: the band's line from +3.0–4.9 to
+  −1.0–+1.8 luma (the photo's own rows read 1.0–1.7 on the same measure), the step against the photo's continued gradient
+  on a clear sky from −3.1–−0.1 to 0.0, at ~35 ms of CPU per expand. Beside a cut cloud the band is left as painted. On by
+  default through `EngineGenerativeFillProvider` with `matchesSurroundings`; `GenerativeFillRoute.seamLevel` nil (the
+  route's default, and the provider with `matchesSurroundings: false`) gives the route before it exactly. The trace
+  carries it (`seamLevel`: per side, the mean step, the share of the seam corrected, the largest change).
 - **Report.** Every call reports the tier, model, quant, the weight and port licences (read from the registered
   manifest), the window, the seed that was used, retries, and whether LaMa ran. `fillReporting` returns the report, and
   `onReport:` delivers it to hosts that use the plain seam.
