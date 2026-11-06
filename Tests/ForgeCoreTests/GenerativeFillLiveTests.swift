@@ -9,10 +9,14 @@
 //
 //      FORGE_FILL_LIVE=1 FORGE_FILL_STORE=<models dir> [FORGE_FILL_TIER=senseNova16GB|senseNova24GB|senseNova32GB|klein16GB]
 //        [FORGE_FILL_IMAGE=<png> FORGE_FILL_MASK=<png> FORGE_FILL_PROMPT="…"] [FORGE_FILL_RUNS=3] [FORGE_FILL_SEED=7]
-//        [FORGE_FILL_EXPAND=right:256] [FORGE_FILL_OUT=<dir>] \
+//        [FORGE_FILL_EXPAND=right:256] [FORGE_FILL_OUT=<dir>] [FORGE_FILL_DEVICE_GB=16] [FORGE_FILL_MATCH=0] \
 //        swift test --build-system swiftbuild --filter GenerativeFillLiveTests/tierRun
 //
 //     Without an image it fills the drawn fixture. Outputs and `receipt-<tier>-<image>.json` land in FORGE_FILL_OUT.
+//     FORGE_FILL_DEVICE_GB emulates that Mac's engine budget (GiB × 0.74, as `atASixteenGigabyteBudgetSenseNovaFill768IsAdmitted`),
+//     so admission and eviction behave as there; the process's own memory is still this Mac's. FORGE_FILL_MATCH=0 runs the
+//     provider with `matchesSurroundings` off: no level and grain match and no fill seam band (AB-R-0773), for a
+//     with/without comparison of the band. Each run prints the engine's residents after it.
 //
 //  2. Bake-off reproduction — the provider on the bake-off's own cases (pixel-agency-image-engine bench/fillbake), with
 //     the bake-off's SenseNova arm (8step-v2-8bit) at the Image Engine's whole-canvas envelope (2048², so the window is
@@ -27,6 +31,7 @@ import CoreGraphics
 import Darwin
 import Foundation
 import ImageIO
+import MLXServeCore
 import UniformTypeIdentifiers
 @testable import ForgeCore
 
@@ -39,7 +44,9 @@ import UniformTypeIdentifiers
     ]
 
     static func service(tier: GenerativeFillTier) async throws -> ForgeEngineService {
-        let service = ForgeEngineService(generativeFillTier: tier)
+        let governor = env["FORGE_FILL_DEVICE_GB"].flatMap(Double.init).map { MemoryGovernor(budgetBytes: UInt64($0 * Double(1 << 30) * 0.74)) }
+        let service = ForgeEngineService(governor: governor, generativeFillTier: tier)
+        if let governor { print(String(format: "fill-live: emulated engine budget %.2f GB", Double(governor.budgetBytes) / 1e9)) }
         if let store = env["FORGE_FILL_STORE"] { await service.attachModelStore(root: URL(fileURLWithPath: store)) }
         await service.registerAll()
         try #require(service.packageID(for: .generativeFill) != nil,
@@ -75,7 +82,7 @@ import UniformTypeIdentifiers
 
         let baseline = Self.physFootprint()
         let service = try await Self.service(tier: tier)
-        let provider = EngineGenerativeFillProvider(service: service)
+        let provider = EngineGenerativeFillProvider(service: service, matchesSurroundings: Self.env["FORGE_FILL_MATCH"] != "0")
         print("fill-live: \(provider.name) on \(name) \(image.width)×\(image.height), prompt \"\(prompt)\"")
 
         var rows: [[String: Any]] = []
@@ -91,7 +98,11 @@ import UniformTypeIdentifiers
                          trace.window.box.x, trace.window.box.y, trace.window.modelWidth, trace.window.modelHeight,
                          trace.seed.map(String.init) ?? "-", trace.retries, trace.fellBackToInpaint ? "LaMa" : "no",
                          Double(phys?.current ?? 0) / 1e9, Double(phys?.peak ?? 0) / 1e9))
+            let residents = await service.engine.residentPackages
+            print("fill-live: run \(run) seam \(trace.seamBridged ? "LaMa" : "no") · residents after: " + residents
+                .map { String(format: "%@ %.2f GB", $0.key.rawValue, Double($0.value) / 1e9) }.sorted().joined(separator: ", "))
             rows.append(["operation": "fill", "run": run, "cold": run == 0, "seconds": result.report.seconds,
+                         "seamBridged": trace.seamBridged, "residents": residents.map { $0.key.rawValue }.sorted(),
                          "physGB": Double(phys?.current ?? 0) / 1e9, "physPeakGB": Double(phys?.peak ?? 0) / 1e9,
                          "report": try JSONSerialization.jsonObject(with: JSONEncoder().encode(result.report))])
         }

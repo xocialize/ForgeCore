@@ -182,7 +182,10 @@ let wider  = try await fill.expand(image, left: 0, top: 0, right: 256, bottom: 0
   the area. Only a model's painting is bridged; a LaMa fallback is not. On by default through
   `EngineGenerativeFillProvider` with `matchesSurroundings`, and left off when LaMa isn't registered, so a fill without
   LaMa still runs as before. `GenerativeFillRoute.bridgesFillSeam` false (the route's default) gives the route before it
-  exactly. The trace's `seamBridged` is now set on a fill too, and the report names LaMa.
+  exactly. The trace's `seamBridged` is now set on a fill too, and the report names LaMa. Memory: on the 16 GB tier the engine evicts
+  SenseNova to run the band (LaMa can't sit beside its window in a 12.7 GB budget), so the peak is unchanged and the next
+  fill reloads SenseNova, as after an expand (2.4 → 3.9–4.1 s warm here; a 2.9–3.9 s load on a real 16 GB Mac's 40–43 s
+  fill). On 24 GB both stay resident and the process peak rises about 1.9 GB (13.9 → 15.8 GB), as an expand's already did.
 - **Report.** Every call reports the tier, model, quant, the weight and port licences (read from the registered
   manifest), the window, the seed that was used, retries, and whether LaMa ran. `fillReporting` returns the report, and
   `onReport:` delivers it to hosts that use the plain seam.
