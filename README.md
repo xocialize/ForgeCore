@@ -3,8 +3,12 @@
 The MLX seam for Forge: the engine service, the image-coding helper, and the engine-backed provider
 adapters — extracted so **more than one app can consume one capability surface**.
 
-Category **B** (engine adapters) under `XocializeForge/CLAUDE.md` § *Package categories*. It may import
-MLX; it owns the heavy pins; nothing in category A may depend on it.
+Category **B** (engine adapters) in Forge's three package categories, which are set by the heaviest thing a
+package imports:
+- **A, the net-clean Kits** (Foundation/AVFoundation, macOS 14, no MLX, no Metal requirement), never depend on B.
+- **B, the engine adapters** (this package) may import MLX, `mlx-engine-swift` and the model wrappers, own those
+  heavy pins in one place, and hold no product logic.
+- **C, apps**, depend on B and hold only what can't be shared.
 
 ## Why this package exists
 

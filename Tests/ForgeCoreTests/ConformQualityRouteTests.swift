@@ -65,7 +65,7 @@ import MLXServeCore
     /// that ran, measure the model's factor, land exactly on the spec, and load only that tier's upscaler — NAFNet
     /// restore never becomes resident. Env-gated (GPU + corpus):
     ///
-    ///     FORGE_CORPUS=/Volumes/Satechi/Development/training-resources/Corpus \
+    ///     FORGE_CORPUS=<corpus dir> \
     ///       swift test --build-system swiftbuild --filter ConformQualityRouteTests
     @Test(.enabled(if: ProcessInfo.processInfo.environment["FORGE_CORPUS"] != nil))
     func eachTierRunsItsOwnModelAndNeverTheRestore() async throws {

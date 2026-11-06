@@ -6,7 +6,7 @@
 //  prepare → run via `measureUpscale`, the path the product ships. Env-gated (needs the GPU and the corpus), so it
 //  never runs in CI:
 //
-//      FORGE_CORPUS=/Volumes/Satechi/Development/training-resources/Corpus [FORGE_FIDELITY_E2E_OUT=<dir>] \
+//      FORGE_CORPUS=<corpus dir> [FORGE_FIDELITY_E2E_OUT=<dir>] \
 //        [FORGE_FIDELITY_E2E_IMAGES=<a.png>:<b.png>] [FORGE_FIDELITY_E2E_ARMS=upscaleFidelity,upscale] \
 //        swift test --build-system swiftbuild --filter UpscaleFidelityLiveTests
 //

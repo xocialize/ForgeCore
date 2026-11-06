@@ -7,7 +7,7 @@
 //  `.fidelity` variant's ×2 route is the native 2x_NERVE_OTF_gan checkpoint). Env-gated (needs the GPU and the corpus),
 //  so it never runs in CI:
 //
-//      FORGE_CORPUS=/Volumes/Satechi/Development/training-resources/Corpus [FORGE_FAST_E2E_OUT=<dir>] \
+//      FORGE_CORPUS=<corpus dir> [FORGE_FAST_E2E_OUT=<dir>] \
 //        [FORGE_FAST_E2E_IMAGES=<a.png>:<b.png>] [FORGE_FAST_E2E_SCALES=4,2] [FORGE_FAST_E2E_ARMS=upscale] \
 //        swift test --build-system swiftbuild --filter UpscaleFastLiveTests
 //

@@ -7,7 +7,7 @@
 //  asserts the delivered file is the asked scale both ways and that the receipt — struct and NDJSON — names the tier and
 //  model that ran. Env-gated (GPU + corpus), so it never runs in CI:
 //
-//      FORGE_CORPUS=/Volumes/Satechi/Development/training-resources/Corpus [FORGE_TIER_E2E_IMAGE=<still>] \
+//      FORGE_CORPUS=<corpus dir> [FORGE_TIER_E2E_IMAGE=<still>] \
 //        swift test --build-system swiftbuild --filter UpscaleTierLiveTests
 //
 //  Default input: `derived/320/stills/RBC_photo.png` (320×569), small enough that the four arms take seconds. Wall times
