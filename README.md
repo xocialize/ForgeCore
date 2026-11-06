@@ -167,11 +167,23 @@ let wider  = try await fill.expand(image, left: 0, top: 0, right: 256, bottom: 0
   default through `EngineGenerativeFillProvider` with `matchesSurroundings`; `GenerativeFillRoute.seamLevel` nil (the
   route's default, and the provider with `matchesSurroundings: false`) gives the route before it exactly. The trace
   carries it (`seamLevel`: per side, the mean step, the share of the seam corrected, the largest change).
+- **A fill's seam, bridged (0.46.0, AB-R-0773).** After the grain and level match, SenseNova's fill still showed its
+  rectangle on soft or fine textures: out-of-focus leaves, crystals, a tree against sky. The fill route had no seam
+  bridge; only expand had one. A fill now gets expand's: LaMa repaints a band just inside the area's edge
+  (`FillRoute.seamBandWidth`, 21 px on a 1024² window) from both sides, after the harmonize and before the grain. On the
+  bake-off's 11 seamless fills (32 GB+ tier, seed 7, the same painting with and without the band) it improved LPIPS
+  0.295 → 0.278 and DISTS 0.158 → 0.144, better on every case, for about 0.6 s. The rectangle edges were gone on every
+  case checked by eye. A band twice as wide scored about the same but softened structure crossing it (a railing). A
+  Moebius band was worse than none (AB-R-0772, AB-R-0773). The band fixes the seam only, not the model's content inside
+  the area. Only a model's painting is bridged; a LaMa fallback is not. On by default through
+  `EngineGenerativeFillProvider` with `matchesSurroundings`, and left off when LaMa isn't registered, so a fill without
+  LaMa still runs as before. `GenerativeFillRoute.bridgesFillSeam` false (the route's default) gives the route before it
+  exactly. The trace's `seamBridged` is now set on a fill too, and the report names LaMa.
 - **Report.** Every call reports the tier, model, quant, the weight and port licences (read from the registered
   manifest), the window, the seed that was used, retries, and whether LaMa ran. `fillReporting` returns the report, and
   `onReport:` delivers it to hosts that use the plain seam.
-- **Needs two models.** `requiredModels` is `[.generativeFill, .inpaint]`: LaMa is the guard's fallback and expand's
-  seam bridge. Offer both downloads before the first fill.
+- **Needs two models.** `requiredModels` is `[.generativeFill, .inpaint]`: LaMa is the guard's fallback and the seam
+  bridge on both fill and expand. Offer both downloads before the first fill.
 - ⚠️ **Not every Mac can run it yet.** SenseNova declares `chipFloor: .pro` (measured on an M5 Pro 24 GB, AB-R-0551),
   so the engine refuses it on base chips until a base-chip receipt. The refusal shows up as `.generativeFill`'s outcome,
   never as a silent swap. The 16 GB tier was confirmed on a real 16 GB Mac (an M1 Pro, AB-R-0602): a 768² fill peaks at

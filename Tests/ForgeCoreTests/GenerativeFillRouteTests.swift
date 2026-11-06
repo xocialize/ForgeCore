@@ -533,6 +533,64 @@ enum FakeModel {
         #expect(trace.seamBridged)
     }
 
+    // MARK: A fill's seam band (AB-R-0773)
+
+    @Test func aFillsSeamIsBridgedByLaMaWhenAsked() async throws {
+        let image = FillPixels(FillFixture.photo())
+        let box = FillBox(x: 240, y: 200, width: 160, height: 120)
+        let mask = FillFixture.mask(width: image.width, height: image.height, box: box)
+        let calls = FillCalls()
+        // Without the level and grain match, so the band's pixels are exactly the fake LaMa's grey.
+        let route = GenerativeFillRoute(maxWindowPixels: 768 * 768, multipleOf: 32, matchesSurroundings: false,
+                                        bridgesFillSeam: true)
+        let (patch, trace) = try #require(try await route.fill(image, mask: mask, prompt: "", seed: 3,
+                                                              paint: FakeModel.painter(original: nil, content: (30, 160, 40), drift: 0, calls: calls),
+                                                              inpaint: FakeModel.lama(calls: calls)))
+        let out = patch.applied(to: image)
+        #expect(calls.paintCount == 1 && calls.inpaintCount == 1)
+        #expect(trace.seamBridged && !trace.fellBackToInpaint && trace.seed == 3)
+        // LaMa got the band just inside the area's edge, the route's width wide, on the window (the whole picture here).
+        let lama = try #require(calls.inpaints.withLock { $0.first })
+        let width = FillRoute.seamBandWidth(width: 640, height: 480)
+        #expect(lama.hole == FillRoute.seamBand(of: mask, width: width))
+        // Its canvas is the painting already composited over the photo: the photo outside, the painting inside.
+        let inside = ((box.y + box.height / 2) * 640 + box.x + box.width / 2) * 4
+        #expect(Array(lama.canvas.rgba[inside..<inside + 3]) == [30, 160, 40])
+        // The band takes LaMa's grey; the middle keeps the painting; every unselected pixel is the input's, exactly.
+        let inBand = ((box.y + 2) * 640 + box.x + box.width / 2) * 4
+        #expect(Array(out.rgba[inBand..<inBand + 3]) == [90, 90, 90])
+        #expect(Array(out.rgba[inside..<inside + 3]) == [30, 160, 40])
+        let changedOutside = (0..<(640 * 480)).filter {
+            mask.values[$0] == 0 && out.rgba[$0 * 4..<$0 * 4 + 4] != image.rgba[$0 * 4..<$0 * 4 + 4]
+        }
+        #expect(changedOutside.isEmpty)
+    }
+
+    @Test func aFillsSeamIsNotBridgedByDefaultOrOnTheLaMaFallback() async throws {
+        let image = FillPixels(FillFixture.photo())
+        let mask = FillFixture.mask(width: image.width, height: image.height, box: FillBox(x: 100, y: 100, width: 120, height: 90))
+        // Off by default: the route before 0.46.0, no LaMa call.
+        let plain = FillCalls()
+        let (_, plainTrace) = try #require(try await GenerativeFillRoute(maxWindowPixels: 768 * 768, multipleOf: 32)
+            .fill(image, mask: mask, prompt: "", seed: 1,
+                  paint: FakeModel.painter(original: nil, content: (30, 160, 40), drift: 0, calls: plain),
+                  inpaint: FakeModel.lama(calls: plain)))
+        #expect(plain.inpaintCount == 0 && !plainTrace.seamBridged)
+        // On, but the guard rejected both paintings: LaMa filled the whole area once, and nothing is bridged on top of it.
+        let rejected = FillCalls()
+        let (_, rejectedTrace) = try #require(try await GenerativeFillRoute(maxWindowPixels: 768 * 768, multipleOf: 32,
+                                                                            bridgesFillSeam: true)
+            .fill(image, mask: mask, prompt: "", seed: 1, paint: FakeModel.keepsMarker(calls: rejected),
+                  inpaint: FakeModel.lama(calls: rejected)))
+        #expect(rejected.inpaintCount == 1 && rejectedTrace.fellBackToInpaint && !rejectedTrace.seamBridged)
+    }
+
+    @Test func theProvidersRouteBridgesAFillsSeamWhenItMatchesSurroundings() {
+        #expect(EngineGenerativeFillProvider.route(for: .senseNova32GB, matchesSurroundings: true).bridgesFillSeam)
+        #expect(!EngineGenerativeFillProvider.route(for: .senseNova32GB, matchesSurroundings: false).bridgesFillSeam)
+        #expect(!GenerativeFillTier.senseNova32GB.route.bridgesFillSeam)
+    }
+
     // MARK: LaMa's bound
 
     @Test func laMaRunsAtTheCanvasSizeUpToItsBoundAndScaledAboveIt() async throws {

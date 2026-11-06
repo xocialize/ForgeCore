@@ -38,6 +38,12 @@
 //  - **New**: an expand's LaMa seam band is levelled to the photo's continued edge (AB-T-0450, `FillSeamLevel`), when
 //    `seamLevel` is set: the band came back with a ~5-luma line in its middle and the strip off the photo's level, so the
 //    photo's rectangle read on a clear sky. nil (the default) gives the route before it exactly.
+//  - **New**: a fill's seam is bridged as an expand's is (AB-R-0773), when `bridgesFillSeam` is set: a band just inside
+//    the area's edge, `FillRoute.seamBandWidth` wide, is repainted by LaMa from both sides' context after the harmonize and
+//    before the grain. SenseNova's painting left a visible rectangle on soft or fine textures (bokeh, crystals, a tree
+//    against sky) that the level and grain match don't remove; the band did on 11 of 11 bake-off seamless fills, LPIPS
+//    0.295 → 0.278 and DISTS 0.158 → 0.144, for about 0.6 s. Only a model's painting is bridged; a LaMa fallback is not.
+//    false (the default) gives the route before it exactly.
 //  - **New**: LaMa (fallback and seam bridge) is bounded to `inpaintMaxPixels` (4 × the window cap by default). Every
 //    bake-off canvas was under it, so LaMa ran at its own size there and does here; a larger canvas is scaled into the
 //    bound for LaMa and back, and the composite takes only the hole / band from it.
@@ -90,7 +96,8 @@ public struct GenerativeFillTrace: Sendable, Equatable, Codable {
     public var rejected: String?
     /// The guard rejected both paintings and LaMa filled the region (the route's fallback).
     public var fellBackToInpaint: Bool
-    /// Expand only: LaMa bridged a band on the new side of the seam.
+    /// LaMa bridged a band on the inner side of the seam: always on an expand that the model painted, and on a fill when
+    /// the route's `bridgesFillSeam` is set (AB-R-0773).
     public var seamBridged: Bool
     /// The level and grain matched to the photo around the area (AB-T-0425); nil when the route doesn't match them.
     public var matched: FillMatchReport? = nil
@@ -122,9 +129,12 @@ public struct GenerativeFillRoute: Sendable {
     /// Expand only: how the LaMa seam band is levelled to the photo's edge (`FillSeamLevel`, AB-T-0450); nil leaves the band
     /// as LaMa bridged it, the route before 0.45.0 exactly.
     public var seamLevel: FillSeamLevel.Settings?
+    /// Fill only: whether LaMa bridges a band just inside the area's edge, as an expand's seam is bridged (AB-R-0773). false
+    /// gives the route before 0.46.0 exactly. The fill then needs the inpainter even when the guard accepts the painting.
+    public var bridgesFillSeam: Bool
 
     public init(maxWindowPixels: Int, multipleOf: Int, minimumRenderPixels: Int = 0, inpaintMaxPixels: Int? = nil,
-                matchesSurroundings: Bool = true, seamLevel: FillSeamLevel.Settings? = nil) {
+                matchesSurroundings: Bool = true, seamLevel: FillSeamLevel.Settings? = nil, bridgesFillSeam: Bool = false) {
         precondition(maxWindowPixels > 0 && multipleOf > 0 && minimumRenderPixels >= 0)
         self.maxWindowPixels = maxWindowPixels
         self.multipleOf = multipleOf
@@ -132,6 +142,7 @@ public struct GenerativeFillRoute: Sendable {
         self.inpaintMaxPixels = inpaintMaxPixels ?? 4 * maxWindowPixels
         self.matchesSurroundings = matchesSurroundings
         self.seamLevel = seamLevel
+        self.bridgesFillSeam = bridgesFillSeam
     }
 
     // MARK: - Window
@@ -203,8 +214,20 @@ public struct GenerativeFillRoute: Sendable {
         let canvas = FillRoute.crop(image, window.box), local = FillRoute.crop(mask, window.box)
         var trace = GenerativeFillTrace(instruction: FillRoute.fillInstruction(prompt: prompt), window: window, seed: nil,
                                         retries: 0, rejected: nil, fellBackToInpaint: false, seamBridged: false)
-        if let painted = try await paintRegion(canvas, region: local, prompt: prompt, parts: nil, checkDark: false,
+        if var painted = try await paintRegion(canvas, region: local, prompt: prompt, parts: nil, checkDark: false,
                                                seed: seed, paint: paint, trace: &trace) {
+            if bridgesFillSeam {
+                // The painting's edge can still read as a rectangle on a soft or fine texture: LaMa repaints a band just
+                // inside it from both sides (AB-R-0773), as an expand's seam is bridged. Outside the area stays the photo's.
+                try Task.checkCancellation()
+                let composed = FillRoute.composite(result: painted, over: canvas, mask: local)
+                let band = FillRoute.seamBand(of: local, width: FillRoute.seamBandWidth(width: canvas.width, height: canvas.height))
+                if FillRoute.bounds(of: band) != nil {
+                    let bridged = try await inpaintBounded(composed, hole: band, inpaint: inpaint)
+                    painted = FillRoute.composite(result: bridged, over: composed, mask: band)
+                    trace.seamBridged = true
+                }
+            }
             return (FillPatch(box: window.box, pixels: grained(painted, canvas: canvas, region: local, seed: seed, trace: &trace),
                               mask: local), trace)
         }

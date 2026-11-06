@@ -71,8 +71,9 @@ public final class EngineGenerativeFillProvider {
 
     private let service: ForgeEngineService
     private let onReport: (@Sendable (GenerativeFillReport) -> Void)?
-    /// Whether the route matches each painting to the photo around it in level and grain (`FillMatch`, AB-T-0425) and levels
-    /// an expand's seam band to the photo's edge (`FillSeamLevel`, AB-T-0450). false gives the bake-off's route exactly (its
+    /// Whether the route matches each painting to the photo around it in level and grain (`FillMatch`, AB-T-0425), levels
+    /// an expand's seam band to the photo's edge (`FillSeamLevel`, AB-T-0450), and bridges a fill's seam with LaMa
+    /// (`bridgesFillSeam`, AB-R-0773; left off when LaMa isn't registered). false gives the bake-off's route exactly (its
     /// parity test).
     public nonisolated let matchesSurroundings: Bool
 
@@ -184,18 +185,23 @@ public final class EngineGenerativeFillProvider {
             guard let output = (response as? InpaintResponse)?.image else { throw GenerativeFillError.unexpectedResponse }
             return FillPixels(try EngineImageCoding.cgImage(from: output))
         }
+        var route = Self.route(for: tier, matchesSurroundings: matchesSurroundings)
+        // A fill's seam band needs LaMa. Without it a fill still runs as it did before the band (it only needed LaMa for
+        // the guard's fallback), so the band is left off rather than failing the call.
+        if lamaID == nil { route.bridgesFillSeam = false }
         return RunContext(tier: tier, packageID: fillID, license: await engine.manifest(for: fillID)?.license,
-                          route: Self.route(for: tier, matchesSurroundings: matchesSurroundings),
-                          paint: paint, inpaint: inpaint)
+                          route: route, paint: paint, inpaint: inpaint)
     }
 
     /// The route this provider runs a tier through: the tier's own, matched to the photo around the area in level and grain
-    /// (`FillMatch`) and with an expand's seam band levelled to the photo's edge (`FillSeamLevel`, AB-T-0450) when
-    /// `matchesSurroundings`; the bake-off's route exactly when not. Public so a probe drives exactly what a host gets.
+    /// (`FillMatch`), with an expand's seam band levelled to the photo's edge (`FillSeamLevel`, AB-T-0450) and a fill's
+    /// seam bridged by LaMa (`bridgesFillSeam`, AB-R-0773) when `matchesSurroundings`; the bake-off's route exactly when
+    /// not. Public so a probe drives exactly what a host gets.
     public nonisolated static func route(for tier: GenerativeFillTier, matchesSurroundings: Bool) -> GenerativeFillRoute {
         var route = tier.route
         route.matchesSurroundings = matchesSurroundings
         route.seamLevel = matchesSurroundings ? .standard : nil
+        route.bridgesFillSeam = matchesSurroundings
         return route
     }
 
