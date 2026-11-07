@@ -9,6 +9,7 @@
 //  2026-10-22). A host still swaps a tier without a new provider or a new ForgeCore.
 //
 
+import EraseFill
 import Foundation
 import MLXToolKit
 import MLXSenseNovaU1

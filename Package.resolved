@@ -1,5 +1,5 @@
 {
-  "originHash" : "d34ce04f0c35121451ef4b4cb5889e2dbe4f791a07b7e5d44134ea69064d5d3b",
+  "originHash" : "21a09be76254ee0783e82259fe2b9fcc87c9b3b83391776124346380d546329b",
   "pins" : [
     {
       "identity" : "anime4k-metal",
@@ -33,8 +33,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/xocialize/EraseKit.git",
       "state" : {
-        "revision" : "9d8e8e385ed47f37a1827fda9cb022ddef8c43ab",
-        "version" : "0.2.0"
+        "revision" : "14754f6dc2ad92ed54bc962bf4d0d139aca95652",
+        "version" : "0.3.0"
       }
     },
     {

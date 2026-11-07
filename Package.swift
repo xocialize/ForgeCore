@@ -48,7 +48,7 @@ let package = Package(
         .package(url: "https://github.com/xocialize/anime4k-metal.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/ExtractKit.git", from: "0.1.0"),
         .package(url: "https://github.com/xocialize/ColorizeKit.git", from: "0.1.0"),
-        .package(url: "https://github.com/xocialize/EraseKit.git", from: "0.2.0"),
+        .package(url: "https://github.com/xocialize/EraseKit.git", from: "0.3.0"),
         // 0.4.1: TextLegibilityGuard.composite keeps 16 bits when either tier did (AB-T-0233).
         .package(url: "https://github.com/xocialize/MaskKit.git", from: "0.5.0"),
         // 0.13.0 = ImageQualityTarget.encodePNG + VideoQualityTarget.EncodeProfile (the web tier).
@@ -200,6 +200,8 @@ let package = Package(
                 .product(name: "ExtractKit", package: "ExtractKit"),
                 .product(name: "ColorizeKit", package: "ColorizeKit"),
                 .product(name: "EraseKit", package: "EraseKit"),
+                // The fill route's pixel steps (FillRoute), shared with pixel-agency-normalizer (AB-A-0180).
+                .product(name: "EraseFill", package: "EraseKit"),
                 .product(name: "MaskKit", package: "MaskKit"),
                 .product(name: "MediaMeasure", package: "media-bridge"),
                 .product(name: "MLXServeCore", package: "mlx-engine-swift"),

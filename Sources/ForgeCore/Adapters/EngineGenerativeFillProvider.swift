@@ -20,6 +20,7 @@
 //  (whichever model the service's `GenerativeFillTier` names) and the fallback / seam bridge is `.inpaint` (LaMa).
 //
 
+import EraseFill
 import Foundation
 import CoreGraphics
 import MLXServeCore

@@ -50,6 +50,7 @@
 //
 
 import CoreGraphics
+import EraseFill
 import Foundation
 
 /// Where the edit model paints, and the size it renders at.

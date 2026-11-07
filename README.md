@@ -197,11 +197,14 @@ let wider  = try await fill.expand(image, left: 0, top: 0, right: 256, bottom: 0
   11,930 MiB MLX and a 12.60 GB process footprint, with swap only on the first load, and takes about 41–43 s warm. It
   needs every other MLX resident evicted first (AB-D-0141); that is the host's job.
 
-The route lives in `Sources/ForgeCore/GenerativeFill/` and is engine-free: CoreGraphics over 8-bit premultiplied RGBA,
-with the model and LaMa injected as closures. `FillRoute`'s functions are the Image Engine's, line for line after a
-type rename. Through this provider, with the bake-off's arm (8step-v2-8bit, seed 7) at the Image Engine's envelope,
-four bake-off cases (two prompted fills, a seamless fill, an extend) come back **bit-identical** to the Image Engine's
-own outputs (`GenerativeFillLiveTests/bakeOffReproduces`).
+The route's orchestration (`GenerativeFillRoute`) lives in `Sources/ForgeCore/GenerativeFill/` and is engine-free: CoreGraphics over
+8-bit premultiplied RGBA, with the model and LaMa injected as closures. Its pixel steps, **`FillRoute`** with `FillPixels`,
+`FillMask` and `FillBox`, live in EraseKit's dependency-free **`EraseFill`** product since 0.47.0 (AB-A-0180). That is the
+one implementation, shared with pixel-agency-normalizer, which Gaea and Pixel Agency Desktop link. ForgeCore re-exports
+those four types, so `import ForgeCore` code needs no change. The functions are the Image Engine's, line for line after a
+type rename. Through this provider, with the bake-off's arm (8step-v2-8bit, seed 7) at the Image Engine's envelope, four
+bake-off cases (two prompted fills, a seamless fill, an extend) come back **bit-identical** to the Image Engine's own
+outputs (`GenerativeFillLiveTests/bakeOffReproduces`). The same holds after the move to EraseFill.
 
 ## The planner hint (§6.3) ships inert — deliberately
 

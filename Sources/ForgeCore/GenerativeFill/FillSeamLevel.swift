@@ -29,6 +29,7 @@
 //  photo's own pixels are never touched.
 //
 
+import EraseFill
 import Foundation
 
 /// What `FillSeamLevel` did to one expand.

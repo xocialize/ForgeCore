@@ -26,6 +26,7 @@
 //    grain gets none; a painting that already matches gets none.
 //
 
+import EraseFill
 import Foundation
 
 /// What `FillMatch` did to one painting: the route's trace carries it, and a host shows it with the layer's provenance.
